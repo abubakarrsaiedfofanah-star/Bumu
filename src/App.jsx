@@ -1,0 +1,1805 @@
+import React, { useEffect, useState, useMemo } from 'react';
+import { SafeAreaView, ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, useWindowDimensions, Image } from 'react-native';
+import Auth from './features/auth/Auth';
+import Dashboard from './features/dashboard/Dashboard';
+import RegisterRider from './features/register/RegisterRider';
+import Customers from './features/customers/Customers';
+import Commissions from './features/commissions/Commissions';
+import Notifications from './features/notifications/Notifications';
+import Security from './features/security/Security';
+import Profile from './features/profile/Profile';
+import Settings from './features/settings/Settings';
+import '../bumu.css';
+
+const routes = [
+  { id: 'dashboard', screen: 'dashboard', label: 'Dashboard', detail: 'Targets, follow-ups, alerts, and urgent rider actions' },
+  { id: 'register', screen: 'register', label: 'Register Rider', detail: 'Create a clean rider contract with duplicate protection' },
+  { id: 'riders', screen: 'customers', label: 'Riders', detail: 'Portfolio, identity checks, documents, and evidence history' },
+  { id: 'payments', screen: 'customers', label: 'Payments', detail: 'Collect payments, check dates, overdue riders, and proof', action: 'Payments hub' },
+  { id: 'transfers', screen: 'customers', label: 'Transfers', detail: 'Review old contracts, repairs, transfer notes, and debt changes', action: 'Track contracts and repairs' },
+  { id: 'commissions', screen: 'commissions', label: 'Commissions', detail: 'Commission totals, paid records, pending records, and CSV export' },
+  { id: 'notifications', screen: 'notifications', label: 'Notifications', detail: 'Payment reminders, document updates, and unread notices' },
+  { id: 'security', screen: 'security', label: 'Security', detail: 'Privacy mask, lock session, PIN, and audit trail' },
+  { id: 'settings', screen: 'settings', label: 'Settings', detail: 'Defaults, password, theme, install app, and reset tools' },
+  { id: 'account', screen: 'profile', label: 'Account', detail: 'Agent profile, identity, approval status, and sign out' },
+];
+
+const featureMenus = {
+  dashboard: [
+    { label: 'Start with priorities', detail: 'Review targets, high-risk riders, and open follow-up tasks.' },
+    { label: 'Check collection progress', detail: 'Compare portfolio value, paid amount, remaining debt, and region progress.' },
+    { label: 'Work the task queue', detail: 'Open each follow-up, finish the call or visit, then mark it done.' },
+    { label: 'Review recent activity', detail: 'Use alerts and activity history to see what changed today.' },
+  ],
+  register: [
+    { label: 'Search identity first', detail: 'Enter National ID, phone, rider card, or chassis to catch duplicate contracts.' },
+    { label: 'Capture rider profile', detail: 'Record legal name, ID, phone, date of birth, gender, location, and occupation.' },
+    { label: 'Attach documents', detail: 'Capture passport, ID front, and ID back references for the rider file.' },
+    { label: 'Assign bike and payment plan', detail: 'Add bike model, chassis, deposit, and installment plan.' },
+    { label: 'Review and submit', detail: 'Check the full application, then create the rider contract.' },
+  ],
+  riders: [
+    { label: 'Find rider fast', detail: 'Search by name, phone, National ID, card ID, person ID, or contract ID.' },
+    { label: 'Open rider summary', detail: 'Check rider identity, agent assignment, balance status, and risk score.' },
+    { label: 'Verify evidence', detail: 'Record visit proof, ID scan, chassis check, promise to pay, and evidence logs.' },
+    { label: 'Export portfolio', detail: 'Download rider records when reporting is needed.' },
+  ],
+  payments: [
+    { label: 'Collect payment', detail: 'Open riders with balances and record proof quickly.' },
+    { label: 'Work payment calendar', detail: 'Pick a date to see expected collections, due dates, and actual payments.' },
+    { label: 'Check overdue riders', detail: 'See riders with debt due or blocked payment status.' },
+    { label: 'Record payment proof', detail: 'Save M-Pesa code, payer phone, amount, and evidence.' },
+  ],
+  transfers: [
+    { label: 'Track contracts and repairs', detail: 'Review old contracts, active debt, repair requests, and projected balance.' },
+    { label: 'Previous agent check', detail: 'Confirm old agent, old contract, and active balance before transfer.' },
+    { label: 'Repair debt review', detail: 'Review repair requests that may increase rider debt.' },
+  ],
+  commissions: [
+    { label: 'Read totals', detail: 'Confirm finance ledger totals and rider commission estimates.' },
+    { label: 'Review ledger', detail: 'Check rider paid amount, progress, estimate rate, and finance status.' },
+    { label: 'Filter by status mentally', detail: 'Use paid, pending, and cancelled labels to spot what needs finance review.' },
+    { label: 'Export report', detail: 'Download commission estimate or finance ledger CSV for reconciliation.' },
+  ],
+  notifications: [
+    { label: 'Open unread first', detail: 'Start from new alerts so payment and document issues are not missed.' },
+    { label: 'Check payment reminders', detail: 'Use reminders to decide who needs a call, visit, or promise to pay.' },
+    { label: 'Review document updates', detail: 'Confirm rider files that changed or need another check.' },
+    { label: 'Clear handled alerts', detail: 'Mark all read after the work is checked.' },
+  ],
+  account: [
+    { label: 'Confirm agent identity', detail: 'Check name, unique agent code, phone, email, and region.' },
+    { label: 'Update profile', detail: 'Edit agent information without changing rider contracts.' },
+    { label: 'Sign out safely', detail: 'Leave the portal when work is done.' },
+  ],
+  security: [
+    { label: 'Mask private data', detail: 'Turn on privacy mode before showing the screen in public.' },
+    { label: 'Lock session', detail: 'Require secure PIN before anyone can continue using the portal.' },
+    { label: 'Change PIN', detail: 'Update the agent unlock code when needed.' },
+    { label: 'Export audit trail', detail: 'Download security activity for supervision or review.' },
+  ],
+  settings: [
+    { label: 'Set agent defaults', detail: 'Control default region, bike model, installment plan, and notification behavior.' },
+    { label: 'Change password', detail: 'Replace the current login password.' },
+    { label: 'Install portal', detail: 'Add the portal to this device where the browser supports it.' },
+    { label: 'Reset workspace', detail: 'Return to dashboard or restore demo data when testing.' },
+  ],
+};
+
+const loadState = (key, defaultValue) => {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const raw = window.localStorage.getItem(`bumu-${key}`);
+    return raw ? JSON.parse(raw) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+};
+
+const saveState = (key, value) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(`bumu-${key}`, JSON.stringify(value));
+  } catch {
+    // Ignore storage errors in private mode.
+  }
+};
+
+const checksum = (value) => {
+  let hash = 0;
+  String(value).split('').forEach((char) => {
+    hash = (hash * 31 + char.charCodeAt(0)) % 99991;
+  });
+  return String(hash).padStart(5, '0');
+};
+
+const compactDate = (date = new Date()) => date.toISOString().slice(2, 10).replace(/-/g, '');
+
+const generateAgentCode = (seed = {}) => {
+  const base = `${seed.email || ''}:${seed.phone || ''}:${Date.now()}:${Math.random()}`;
+  return `AG-KE-${compactDate()}-${checksum(base)}`;
+};
+
+const generateRiderCardId = (agentCode, seed, existing = []) => {
+  let attempt = 0;
+  let cardId = '';
+  do {
+    const base = `${agentCode}:${seed}:${Date.now()}:${Math.random()}:${attempt}`;
+    cardId = `RDR-${agentCode || 'AG'}-${checksum(base)}`;
+    attempt += 1;
+  } while (existing.some((customer) => customer.cardId === cardId));
+  return cardId;
+};
+
+const generateRiderPersonId = (seed = {}) => {
+  const stableSeed = `${seed.nationalId || ''}:${normalizePhone(seed.phone || '')}`;
+  return `RID-KE-${checksum(stableSeed || `${Date.now()}:${Math.random()}`)}`;
+};
+
+const generateContractId = (agentCode, seed, existing = []) => {
+  let attempt = 0;
+  let contractId = '';
+  do {
+    const base = `${agentCode}:${seed}:${Date.now()}:${Math.random()}:${attempt}`;
+    contractId = `CTR-${agentCode || 'AG'}-${checksum(base)}`;
+    attempt += 1;
+  } while (existing.some((customer) => customer.contractId === contractId));
+  return contractId;
+};
+
+const normalizePhone = (value) => String(value || '').replace(/[\s-]/g, '');
+
+const accountStatus = (customer) => {
+  const remaining = Number(customer.remaining || 0);
+  if (remaining <= 0) return 'Cleared';
+  if (customer.overdue) return `Debt overdue: KES ${remaining.toLocaleString('en-KE')}`;
+  return `Debt active: KES ${remaining.toLocaleString('en-KE')}`;
+};
+
+const initialCustomers = [
+  { id: 1, name: 'John Doe', phone: '0710 123 456', nationalId: '23456789', region: 'Nairobi', location: 'Nairobi', occupation: 'Courier', status: 'Active', cardId: 'BUMU-KE-0001-7A3C', bike: 'Boxer 150', chassis: 'BX150-24-9182', deposit: 'KES 18,000', installment: 'Daily KES 300', totalPrice: 180000, progress: 72, lastPayment: 'KES 1,200 two days ago', paid: 129600, remaining: 50400, dueDate: '2026-06-21', risk: 32, overdue: false, createdAt: '2026-05-20', transactions: [{ id: 101, date: '2026-05-24', amount: 18000, type: 'Deposit', note: 'Initial deposit', balanceAfter: 162000 }, { id: 102, date: '2026-05-29', amount: 111600, type: 'Installment', note: 'Multiple payments', balanceAfter: 50400 }] },
+  { id: 2, name: 'Jane Mwangi', phone: '0720 234 567', nationalId: '28661102', region: 'Mombasa', location: 'Mombasa', occupation: 'Retailer', status: 'Pending', cardId: 'BUMU-KE-0002-8B4D', bike: 'TVS Star', chassis: 'TVS-91-4408', deposit: 'KES 12,000', installment: 'Weekly KES 2,000', totalPrice: 150000, progress: 38, lastPayment: 'KES 900 seven days ago', paid: 57000, remaining: 93000, dueDate: '2026-05-30', risk: 56, overdue: true, createdAt: '2026-05-25', transactions: [{ id: 201, date: '2026-05-25', amount: 12000, type: 'Deposit', note: 'Initial deposit', balanceAfter: 138000 }, { id: 202, date: '2026-05-28', amount: 45000, type: 'Installment', note: 'Weekly payment', balanceAfter: 93000 }] },
+  { id: 3, name: 'Paul Kimani', phone: '0730 345 678', nationalId: '31880044', region: 'Kisumu', location: 'Kisumu', occupation: 'Rider', status: 'Active', cardId: 'BUMU-KE-0003-9C5E', bike: 'Boxer 150', chassis: 'BX150-73-1160', deposit: 'KES 20,000', installment: 'Daily KES 300', totalPrice: 180000, progress: 88, lastPayment: 'KES 1,500 yesterday', paid: 158400, remaining: 21600, dueDate: '2026-06-12', risk: 21, overdue: false, createdAt: '2026-05-18', transactions: [{ id: 301, date: '2026-05-18', amount: 20000, type: 'Deposit', note: 'Initial deposit', balanceAfter: 160000 }, { id: 302, date: '2026-05-28', amount: 138400, type: 'Installment', note: 'Daily payments', balanceAfter: 21600 }] },
+  { id: 4, name: 'Alice Njeri', phone: '0711 456 789', nationalId: '25119005', region: 'Nakuru', location: 'Nakuru', occupation: 'Trader', status: 'Info Required', cardId: 'BUMU-KE-0004-0D6F', bike: 'Boxer 150', chassis: 'BX150-73-9001', deposit: 'KES 10,000', installment: 'Daily KES 300', totalPrice: 180000, progress: 15, lastPayment: 'KES 300 three weeks ago', paid: 27000, remaining: 153000, dueDate: '2026-05-20', risk: 78, overdue: true, createdAt: '2026-05-15', transactions: [{ id: 401, date: '2026-05-16', amount: 10000, type: 'Deposit', note: 'Initial deposit', balanceAfter: 170000 }, { id: 402, date: '2026-05-21', amount: 17000, type: 'Installment', note: 'Partial payment', balanceAfter: 153000 }] },
+];
+
+const initialCommissions = [
+  { id: 1, rider: 'John Doe', type: 'Upfront', amount: 4200, status: 'Paid', date: '2026-05-16' },
+  { id: 2, rider: 'Jane Mwangi', type: 'Installment', amount: 1800, status: 'Pending', date: '2026-05-21' },
+  { id: 3, rider: 'Paul Kimani', type: 'Referral', amount: 900, status: 'Paid', date: '2026-05-14' },
+  { id: 4, rider: 'Alice Njeri', type: 'Upfront', amount: 2200, status: 'Cancelled', date: '2026-05-08' },
+];
+
+const initialNotifications = [
+  { id: 1, title: 'Payment received', body: 'KES 1,200 from John Doe has been confirmed.', unread: true, category: 'payment' },
+  { id: 2, title: 'Document update needed', body: 'Alice Njeri uploaded a new ID photo for review.', unread: true, category: 'document' },
+  { id: 3, title: 'Commission payout', body: 'Your commission payment for April is ready.', unread: false, category: 'commission' },
+  { id: 4, title: 'New rider pending', body: 'Jane Mwangi requires verification for the first payment.', unread: false, category: 'task' },
+];
+
+const initialTasks = [
+  { id: 1, customerId: 2, customerName: 'Jane Mwangi', title: 'Verify payment status', due: 'Today', status: 'Open', note: 'Confirm weekly installment and document upload.' },
+  { id: 2, customerId: 4, customerName: 'Alice Njeri', title: 'Review verification documents', due: 'Tomorrow', status: 'Open', note: 'Check latest ID photo and confirm next steps.' },
+  { id: 3, customerId: 1, customerName: 'John Doe', title: 'Confirm repayment plan', due: 'Next 2 days', status: 'Open', note: 'Touch base on progress and next expected payment.' },
+];
+
+const defaultAgent = {
+  fullName: 'Ann Mwangi',
+  agentCode: 'AG-KE-DEMO-02048',
+  phone: '0710 888 222',
+  email: 'ann.mwangi@bumu.co.ke',
+  region: 'Nairobi',
+  password: 'agent123',
+  agentPhoto: '',
+  agentIdFront: '',
+  agentIdBack: '',
+  approvalStatus: 'Approved',
+  profileApprovalStatus: 'Approved',
+  pendingProfileUpdate: null,
+};
+
+export default function App() {
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [route, setRoute] = useState('dashboard');
+  const [navMenuOpen, setNavMenuOpen] = useState(true);
+  const [commandQuery, setCommandQuery] = useState('');
+  const [commandRiderId, setCommandRiderId] = useState(null);
+  const [theme, setTheme] = useState('light');
+  const [agent, setAgent] = useState(() => loadState('agent', defaultAgent));
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [customers, setCustomers] = useState(() => loadState('customers', initialCustomers));
+  const [commissions, setCommissions] = useState(() => loadState('commissions', initialCommissions));
+  const [notifications, setNotifications] = useState(() => loadState('notifications', initialNotifications));
+  const [tasks, setTasks] = useState(() => loadState('tasks', initialTasks));
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
+  const [installStatus, setInstallStatus] = useState('Install button appears when your browser allows app installation.');
+  const [security, setSecurity] = useState(() => loadState('security', {
+    locked: false,
+    pin: '1234',
+    unlockPin: '',
+    privacyMode: false,
+    auditLog: [],
+    failedUnlocks: 0,
+  }));
+  const [settings, setSettings] = useState(() => loadState('settings', {
+    smsNotifications: true,
+    inAppNotifications: true,
+    paymentReminders: true,
+    smsAlerts: true,
+    simpleMode: false,
+    compactTables: false,
+    defaultBikeModel: 'Boxer 150',
+    defaultInstallment: 'Daily KES 300',
+    defaultRegion: 'Nairobi',
+    sessionTimeout: '30 minutes',
+  }));
+
+  const windowWidth = useWindowDimensions().width;
+  const isDesktop = windowWidth >= 900;
+  const isCompact = windowWidth < 720;
+  const styles = useMemo(() => createStyles(theme, isDesktop, isCompact), [theme, isDesktop, isCompact]);
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.body.classList.toggle('dark-mode', theme === 'dark');
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setDeferredInstallPrompt(event);
+      setInstallStatus('Ready to install on this device.');
+    };
+    const onAppInstalled = () => {
+      setDeferredInstallPrompt(null);
+      setInstallStatus('BUMU Agent Portal is installed on this device.');
+    };
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onAppInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onAppInstalled);
+    };
+  }, []);
+
+  useEffect(() => saveState('theme', theme), [theme]);
+  useEffect(() => saveState('agent', agent), [agent]);
+  useEffect(() => saveState('customers', customers), [customers]);
+  useEffect(() => saveState('commissions', commissions), [commissions]);
+  useEffect(() => saveState('notifications', notifications), [notifications]);
+  useEffect(() => saveState('tasks', tasks), [tasks]);
+  useEffect(() => saveState('settings', settings), [settings]);
+  useEffect(() => saveState('security', security), [security]);
+
+  useEffect(() => {
+    setCustomers((current) => current.map((c, index) => {
+      const assignedAgentCode = c.assignedAgentCode || c.agentCode || agent.agentCode;
+      const cardId = c.cardId || generateRiderCardId(assignedAgentCode, `${c.nationalId || c.phone || index}`, current);
+      const riderAssignmentId = c.riderAssignmentId || `ASN-${assignedAgentCode}-${checksum(`${cardId}:${c.id}`)}`;
+      const riderPersonId = c.riderPersonId || generateRiderPersonId(c);
+      const contractId = c.contractId || generateContractId(assignedAgentCode, `${cardId}:${c.id}`, current);
+      const risk = computeRisk(c);
+      const verifiedByDefault = c.status === 'Active' && risk < 60 && !c.flagged;
+      const verificationChecklist = {
+        idSeen: verifiedByDefault,
+        chassisConfirmed: verifiedByDefault,
+        passportPhoto: verifiedByDefault,
+        idFront: verifiedByDefault,
+        idBack: verifiedByDefault,
+        idScan: verifiedByDefault,
+        ...(c.verificationChecklist || {}),
+      };
+      return {
+        ...c,
+        cardId,
+        riderPersonId,
+        contractId,
+        assignedAgentCode,
+        agentCode: assignedAgentCode,
+        registeredByAgentCode: c.registeredByAgentCode || assignedAgentCode,
+        riderAssignmentId,
+        contractStatus: c.contractStatus || (Number(c.remaining || 0) > 0 ? 'Active' : 'Cleared'),
+        contractSequence: c.contractSequence || 1,
+        verificationChecklist,
+        risk,
+        flagged: risk >= 60,
+      };
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const computeRisk = (c) => {
+    const progress = Number(c.progress || 0);
+    let score = Math.max(0, 50 - progress);
+    if (c.overdue) score += 25;
+    if (c.status === 'Info Required') score += 20;
+    const lastPaymentDate = c.transactions?.length ? new Date(c.transactions[c.transactions.length - 1].date) : null;
+    if (lastPaymentDate) {
+      const days = Math.floor((Date.now() - lastPaymentDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (days > 30) score += 15;
+    }
+    const recentPayments = (c.transactions || []).filter((t) => new Date(t.date) >= new Date(Date.now() - 1000 * 60 * 60 * 24 * 7));
+    if (recentPayments.length > 3) score += 10;
+    return Math.min(100, Math.max(0, Math.round(score)));
+  };
+
+  const markNotificationsRead = () => {
+    setNotifications((current) => current.map((item) => ({ ...item, unread: false })));
+  };
+
+  const toggleNotificationDetails = (id) => {
+    setNotifications((current) => current.map((item) => item.id === id ? { ...item, unread: false } : item));
+  };
+
+  const sendRiderMessage = (customerId, message) => {
+    const customer = customers.find((item) => item.id === customerId);
+    if (!customer || !message || !String(message).trim()) return;
+    const notification = {
+      id: Date.now(),
+      title: `Message sent to ${customer.name}`,
+      body: `Text message to ${customer.name} (${customer.phone}): ${message}`,
+      unread: true,
+      category: 'message',
+      customerId,
+      target: 'rider',
+    };
+    setNotifications((current) => [notification, ...current]);
+    audit('Rider message sent', `Sent message to ${customer.name}`);
+  };
+
+  const createDueReminder = (customer, label, copy) => ({
+    id: Date.now() + Math.floor(Math.random() * 10000),
+    title: `Payment reminder for ${customer.name}`,
+    body: `${copy} (${customer.installment || 'Installment plan'}) - due ${customer.dueDate}`,
+    unread: true,
+    category: 'reminder',
+    customerId: customer.id,
+    reminderKey: `${customer.id}-${label}`,
+    target: 'rider',
+  });
+
+  const parseDueTimestamp = (dueDate) => {
+    if (!dueDate) return null;
+    const parts = String(dueDate).split('-');
+    if (parts.length !== 3) return new Date(dueDate).getTime();
+    const [year, month, day] = parts.map((part) => Number(part));
+    return new Date(year, month - 1, day, 17, 0, 0).getTime();
+  };
+
+  const updateSetting = (key, value) => {
+    setSettings((current) => ({ ...current, [key]: value }));
+  };
+
+  const runDueReminderChecks = () => {
+    const now = Date.now();
+    const windows = [
+      { label: '2h', min: 60 * 60 * 1000, max: 2 * 60 * 60 * 1000, copy: 'Payment due in about 2 hours' },
+      { label: '1h', min: 30 * 60 * 1000, max: 60 * 60 * 1000, copy: 'Payment due in about 1 hour' },
+      { label: '30m', min: 10 * 60 * 1000, max: 30 * 60 * 1000, copy: 'Payment due in about 30 minutes' },
+      { label: '5m', min: 0, max: 10 * 60 * 1000, copy: 'Payment due in under 5 minutes' },
+    ];
+
+    setNotifications((current) => {
+      const next = [...current];
+      customers.forEach((customer) => {
+        const dueTs = parseDueTimestamp(customer.dueDate);
+        if (!dueTs) return;
+        const delta = dueTs - now;
+        if (delta < 0 || delta > 2 * 60 * 60 * 1000) return;
+        const window = windows.find((item) => delta <= item.max && delta > item.min);
+        if (!window) return;
+        const reminderKey = `${customer.id}-${window.label}`;
+        if (next.some((item) => item.reminderKey === reminderKey)) return;
+        next.unshift(createDueReminder(customer, window.label, window.copy));
+      });
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    runDueReminderChecks();
+    const interval = setInterval(runDueReminderChecks, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [customers]);
+
+  const handleLogin = (email, password) => {
+    if (email === defaultAgent.email && password === defaultAgent.password) {
+      setAgent((current) => ({
+        ...defaultAgent,
+        agentPhoto: current.agentPhoto || defaultAgent.agentPhoto,
+        agentIdFront: current.agentIdFront || defaultAgent.agentIdFront,
+        agentIdBack: current.agentIdBack || defaultAgent.agentIdBack,
+      }));
+      setLoggedIn(true);
+      return true;
+    }
+    if (!agent || !agent.email) return false;
+    if (email !== agent.email || password !== agent.password) return false;
+    if (agent.approvalStatus && agent.approvalStatus !== 'Approved') return false;
+    setLoggedIn(true);
+    return true;
+  };
+
+  const handleRegisterAgent = (data) => {
+    const newAgent = {
+      fullName: data.fullName,
+      nationalId: data.nationalId,
+      phone: data.phone,
+      region: data.region,
+      agentPhoto: data.agentPhoto,
+      agentIdFront: data.agentIdFront,
+      agentIdBack: data.agentIdBack,
+      email: data.email,
+      password: data.password,
+      agentCode: generateAgentCode(data),
+      approvalStatus: 'Pending',
+      profileApprovalStatus: 'Pending',
+      pendingProfileUpdate: null,
+    };
+    setAgent(newAgent);
+    setNotifications((current) => [
+      { id: Date.now(), title: 'Agent approval pending', body: `${data.fullName} registered and is waiting for admin approval.`, unread: true, category: 'agent' },
+      ...current,
+    ]);
+    audit('Agent registered pending approval', `Registered ${data.fullName}; waiting for admin approval`);
+    return { success: true, pending: true, message: 'Agent account created. Status: Pending admin approval.' };
+  };
+
+  const handleLogout = () => {
+    setLoggedIn(false);
+    setRoute('dashboard');
+    audit('Agent logout', 'Agent logged out');
+  };
+
+  const handleUpdateAgent = (updatedAgent) => {
+    setAgent((current) => {
+      const pendingProfileUpdate = {
+        fullName: updatedAgent.fullName ?? current.fullName,
+        nationalId: updatedAgent.nationalId ?? current.nationalId,
+        phone: updatedAgent.phone ?? current.phone,
+        email: updatedAgent.email ?? current.email,
+        region: updatedAgent.region ?? current.region,
+        requestedAt: new Date().toLocaleString(),
+      };
+      return {
+        ...current,
+        agentCode: current.agentCode,
+        profileApprovalStatus: 'Pending',
+        pendingProfileUpdate,
+      };
+    });
+    setNotifications((current) => [
+      { id: Date.now(), title: 'Agent profile change pending', body: `${agent.agentCode} submitted profile changes for admin approval.`, unread: true, category: 'agent' },
+      ...current,
+    ]);
+    audit('Agent profile change pending', 'Agent details were submitted for admin approval');
+  };
+
+  const handleChangePassword = (passwordData) => {
+    if (passwordData.current !== agent.password) {
+      setPasswordMessage('Current password does not match.');
+      return;
+    }
+    if (passwordData.next.length < 6) {
+      setPasswordMessage('Use at least 6 characters for the new password.');
+      return;
+    }
+    if (passwordData.next !== passwordData.confirm) {
+      setPasswordMessage('New password and confirmation do not match.');
+      return;
+    }
+    setAgent((current) => ({ ...current, password: passwordData.next }));
+    setPasswordMessage('Password updated successfully.');
+    audit('Password changed', 'Agent password was updated');
+  };
+
+  const addCustomerPayment = (customerId, amount, note, proof = {}) => {
+    const paymentAmount = Number(String(amount || '').replace(/[^\d.]/g, '')) || 0;
+    if (paymentAmount <= 0) return;
+
+    
+
+    setCustomers((current) => current.map((customer) => {
+      if (customer.id !== customerId) return customer;
+      const total = customer.totalPrice || 0;
+      const paid = Number(customer.paid || 0) + paymentAmount;
+      const remaining = Math.max(0, total - paid);
+      const percent = total ? Math.round((paid / total) * 100) : 0;
+      const date = new Date().toISOString().slice(0, 10);
+      const transaction = {
+        id: Date.now(),
+        date,
+        amount: paymentAmount,
+        type: 'Payment',
+        note: note || 'Manual payment',
+        mpesaCode: proof.mpesaCode || '',
+        payerPhone: proof.payerPhone || '',
+        proofFile: proof.proofFile || '',
+        duplicateWarning: proof.mpesaCode && (customer.transactions || []).some((tx) => tx.mpesaCode && tx.mpesaCode === proof.mpesaCode),
+        balanceAfter: remaining,
+      };
+      const updated = {
+        ...customer,
+        paid,
+        remaining,
+        progress: percent,
+        lastPayment: `KES ${paymentAmount.toLocaleString()} on ${date}`,
+        overdue: remaining > 0 && new Date(customer.dueDate) < new Date(),
+        transactions: [...(customer.transactions || []), transaction],
+      };
+      const risk = computeRisk(updated);
+      return { ...updated, risk, flagged: risk >= 60 };
+    }));
+    audit('Payment recorded', `Customer ${customerId} paid KES ${paymentAmount}`);
+  };
+
+  const addFollowUpTask = (customerId, actionTitle, note) => {
+    const customer = customers.find((item) => item.id === customerId);
+    if (!customer) return;
+    const nextId = Math.max(0, ...tasks.map((task) => task.id), 0) + 1;
+    const newTask = {
+      id: nextId,
+      customerId,
+      customerName: customer.name,
+      title: actionTitle,
+      note: note || 'Follow up with the rider to keep account on track.',
+      due: 'Today',
+      status: 'Open',
+    };
+    setTasks((current) => [newTask, ...current]);
+    audit('Follow-up task created', `${actionTitle} for ${customer.name}`);
+  };
+
+  const addCustomerAgentRecord = (customerId, type, payload = {}) => {
+    const time = new Date().toLocaleString();
+    const date = new Date().toISOString().slice(0, 10);
+    setCustomers((current) => current.map((customer) => {
+      if (customer.id !== customerId) return customer;
+      const entry = {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        type,
+        time,
+        date,
+        agentCode: agent.agentCode,
+        ...payload,
+      };
+      const timelineEntry = {
+        ...entry,
+        title: payload.title || type,
+        detail: payload.detail || payload.note || payload.result || '',
+      };
+      const next = { ...customer };
+      if (type === 'visit') next.visitLogs = [entry, ...(customer.visitLogs || [])];
+      if (type === 'promise') next.promiseLogs = [entry, ...(customer.promiseLogs || [])];
+      if (type === 'evidence') next.evidenceLogs = [entry, ...(customer.evidenceLogs || [])];
+      if (type === 'excuse') next.excuseLogs = [entry, ...(customer.excuseLogs || [])];
+      if (type === 'id-scan') next.idScanLogs = [entry, ...(customer.idScanLogs || [])];
+      if (type === 'chassis-check') next.chassisChecks = [entry, ...(customer.chassisChecks || [])];
+      if (type === 'repair-debt') next.repairDebtRequests = [entry, ...(customer.repairDebtRequests || [])];
+      if (type === 'transfer-request') next.transferRequests = [entry, ...(customer.transferRequests || [])];
+      next.riskNotes = [timelineEntry, ...(customer.riskNotes || [])].slice(0, 30);
+      next.flagged = next.flagged || ['excuse', 'chassis-check', 'id-scan'].includes(type);
+      return next;
+    }));
+    audit(`Agent ${type}`, payload.title || payload.detail || `Updated customer ${customerId}`);
+  };
+
+  const updateCustomerChecklist = (customerId, key, value) => {
+    setCustomers((current) => current.map((customer) => {
+      if (customer.id !== customerId) return customer;
+      const checklist = { ...(customer.verificationChecklist || {}), [key]: value };
+      return {
+        ...customer,
+        verificationChecklist: checklist,
+        riskNotes: [
+          {
+            id: Date.now(),
+            type: 'checklist',
+            time: new Date().toLocaleString(),
+            date: new Date().toISOString().slice(0, 10),
+            agentCode: agent.agentCode,
+            title: value ? 'Checklist confirmed' : 'Checklist unchecked',
+            detail: key,
+          },
+          ...(customer.riskNotes || []),
+        ].slice(0, 30),
+      };
+    }));
+    audit('Verification checklist updated', `${key}: ${value ? 'yes' : 'no'}`);
+  };
+
+  const completeFollowUpTask = (taskId) => {
+    setTasks((current) => current.map((task) => task.id === taskId ? { ...task, status: 'Done' } : task));
+    const task = tasks.find((item) => item.id === taskId);
+    if (task) audit('Follow-up task completed', task.title);
+  };
+
+  const audit = (action, details = '') => {
+    setSecurity((current) => ({
+      ...current,
+      auditLog: [
+        { action, details, agent: agent.agentCode, time: new Date().toLocaleString() },
+        ...(current.auditLog || []),
+      ].slice(0, 80),
+    }));
+  };
+
+  const submitRider = (form) => {
+    const normalizedPhone = normalizePhone(form.phone);
+    const cleanValue = (value) => String(value || '').trim().toLowerCase();
+    const duplicateMatches = customers
+      .map((customer) => {
+        const reasons = [];
+        if (form.nationalId && cleanValue(customer.nationalId) === cleanValue(form.nationalId)) reasons.push('National ID');
+        if (form.phone && normalizePhone(customer.phone) === normalizedPhone) reasons.push('Phone number');
+        if (form.riderCardId && cleanValue(customer.cardId || customer.customerCardId) === cleanValue(form.riderCardId)) reasons.push('Rider card ID');
+        if (form.chassis && cleanValue(customer.chassis) === cleanValue(form.chassis)) reasons.push('Chassis number');
+        return reasons.length ? { customer, reasons } : null;
+      })
+      .filter(Boolean);
+    const duplicate = duplicateMatches.find((match) => Number(match.customer.remaining || 0) > 0)?.customer || duplicateMatches[0]?.customer;
+    const duplicateReasons = duplicateMatches.find((match) => match.customer.id === duplicate?.id)?.reasons || [];
+    const duplicateBalance = duplicate ? Number(duplicate.remaining || 0) : 0;
+    const duplicateAgent = duplicate?.assignedAgentCode || duplicate?.agentCode || 'another agent';
+    const duplicateStatus = duplicate ? accountStatus(duplicate) : '';
+    if (duplicate && duplicateBalance > 0) {
+      const message = `Blocked: Rider has active debt under ${duplicateAgent}. Balance: KES ${duplicateBalance.toLocaleString('en-KE')}. Matched by ${duplicateReasons.join(', ') || 'identity trace'}.`;
+      setCustomers((current) => current.map((customer) => {
+        if (customer.id !== duplicate.id) return customer;
+        return {
+          ...customer,
+          flagged: true,
+          duplicateAttempts: [
+            {
+              id: Date.now(),
+              agentCode: agent.agentCode,
+              time: new Date().toLocaleString(),
+              detail: `Duplicate registration attempt by ${form.fullName || 'unknown rider'} using ${duplicateReasons.join(', ') || form.nationalId || form.phone}.`,
+            },
+            ...(customer.duplicateAttempts || []),
+          ],
+          riskNotes: [
+            {
+              id: Date.now() + 1,
+              type: 'duplicate-block',
+              title: 'Duplicate registration blocked',
+              detail: message,
+              agentCode: agent.agentCode,
+              time: new Date().toLocaleString(),
+              date: new Date().toISOString().slice(0, 10),
+            },
+            ...(customer.riskNotes || []),
+          ].slice(0, 30),
+        };
+      }));
+      setNotifications((current) => [
+        { id: Date.now(), title: 'Duplicate registration blocked', body: message, unread: true, category: 'risk' },
+        ...current,
+      ]);
+      audit('Duplicate registration blocked', message);
+      return { success: false, message };
+    }
+    const nextId = Math.max(0, ...customers.map((customer) => customer.id)) + 1;
+    const totalPrice = form.bikeModel === 'TVS Star' ? 150000 : 180000;
+    const depositAmount = Number(String(form.deposit || '').replace(/[^\d.]/g, '')) || 0;
+    const remainingAmount = Math.max(0, totalPrice - depositAmount);
+    const createdAt = new Date().toISOString();
+    const cardId = generateRiderCardId(agent.agentCode, `${form.nationalId}:${form.phone}:${nextId}`, customers);
+    const riderAssignmentId = `ASN-${agent.agentCode}-${checksum(`${cardId}:${nextId}`)}`;
+    const returningRider = !!duplicate && duplicateBalance <= 0;
+    const riderPersonId = duplicate?.riderPersonId || generateRiderPersonId(form);
+    const contractId = generateContractId(agent.agentCode, `${riderPersonId}:${nextId}`, customers);
+    const previousContracts = duplicate
+      ? customers.filter((customer) => (
+        customer.riderPersonId === duplicate.riderPersonId
+        || customer.nationalId === duplicate.nationalId
+        || normalizePhone(customer.phone) === normalizePhone(duplicate.phone)
+      ))
+      : [];
+    const newCustomer = {
+      id: nextId,
+      riderPersonId,
+      contractId,
+      name: form.fullName,
+      phone: form.phone,
+      nationalId: form.nationalId,
+      region: form.location,
+      location: form.location,
+      occupation: form.occupation,
+      status: 'Pending',
+      cardId,
+      riderAssignmentId,
+      assignedAgentCode: agent.agentCode,
+      agentCode: agent.agentCode,
+      registeredByAgentCode: agent.agentCode,
+      previousAgentCode: duplicateAgent !== 'another agent' && returningRider ? duplicateAgent : '',
+      linkedPreviousContractId: returningRider ? duplicate?.contractId || duplicate?.cardId || '' : '',
+      linkedPreviousAgentCode: duplicateAgent !== 'another agent' && returningRider ? duplicateAgent : '',
+      linkedRiderId: duplicate?.cardId || '',
+      returningRider,
+      contractStatus: remainingAmount > 0 ? 'Active' : 'Cleared',
+      contractSequence: returningRider ? previousContracts.length + 1 : 1,
+      assignmentNote: returningRider ? `Returning rider. Previous account under ${duplicateAgent} is cleared. New contract created for ${agent.agentCode}; old card ${duplicate.cardId} remains linked.` : '',
+      bike: form.bikeModel,
+      chassis: form.chassis,
+      deposit: form.deposit,
+      installment: form.installment,
+      totalPrice,
+      progress: Math.round((depositAmount / totalPrice) * 100),
+      lastPayment: depositAmount ? `${form.deposit} deposit captured` : 'No payment yet',
+      paid: depositAmount,
+      remaining: remainingAmount,
+      dueDate: '2026-06-30',
+      risk: computeRisk({ progress: Math.round((depositAmount / totalPrice) * 100), overdue: remainingAmount > 0, status: 'Pending', transactions: depositAmount ? [{ id: Date.now(), date: createdAt.slice(0, 10), amount: depositAmount }] : [] }),
+      flagged: computeRisk({ progress: Math.round((depositAmount / totalPrice) * 100), overdue: remainingAmount > 0, status: 'Pending', transactions: depositAmount ? [{ id: Date.now(), date: createdAt.slice(0, 10), amount: depositAmount }] : [] }) >= 60,
+      overdue: remainingAmount > 0,
+      documentFiles: {
+        passportPhoto: form.passport,
+        passportPreview: form.passportPreview,
+        idFront: form.idFront,
+        idFrontPreview: form.idFrontPreview,
+        idBack: form.idBack,
+        idBackPreview: form.idBackPreview,
+        idScan: form.idScan,
+        idScanPreview: form.idScanPreview,
+        idScanText: form.idScanText,
+      },
+      verificationChecklist: {
+        idSeen: false,
+        chassisConfirmed: false,
+        passportPhoto: !!form.passport,
+        idFront: !!form.idFront,
+        idBack: !!form.idBack,
+        idScan: !!form.idScan,
+      },
+      idScanLogs: form.idScan ? [{
+        id: Date.now() + 3,
+        type: 'id-scan',
+        result: form.idScanText || 'ID card image captured for OCR-ready review',
+        detail: form.idScan,
+        agentCode: agent.agentCode,
+        time: new Date().toLocaleString(),
+        date: createdAt.slice(0, 10),
+      }] : [],
+      evidenceLogs: [{
+        id: Date.now() + 4,
+        type: 'registration-documents',
+        title: 'Registration documents captured',
+        detail: `Passport: ${form.passport}; ID front: ${form.idFront}; ID back: ${form.idBack}; ID scan: ${form.idScan}`,
+        agentCode: agent.agentCode,
+        time: new Date().toLocaleString(),
+        date: createdAt.slice(0, 10),
+      }],
+      createdAt,
+      transactions: depositAmount ? [{ id: Date.now(), date: createdAt.slice(0, 10), amount: depositAmount, type: 'Deposit', note: 'Initial deposit', balanceAfter: remainingAmount }] : [],
+      riskNotes: returningRider ? [{
+        id: Date.now() + 2,
+        type: 'returning-rider',
+        title: 'Returning rider new contract',
+        detail: `Previous cleared account found under ${duplicateAgent}. New contract opened by ${agent.agentCode}.`,
+        agentCode: agent.agentCode,
+        time: new Date().toLocaleString(),
+        date: createdAt.slice(0, 10),
+      }] : [],
+    };
+    setCustomers((current) => [newCustomer, ...current]);
+    setCommissions((current) => [
+      { id: Date.now(), rider: form.fullName, type: 'Registration', amount: 500, status: 'Pending', date: new Date().toISOString().slice(0, 10) },
+      ...current,
+    ]);
+    setNotifications((current) => [
+      { id: Date.now(), title: returningRider ? 'Returning rider new contract' : 'New rider pending', body: returningRider ? `${form.fullName} had a cleared previous account under ${duplicateAgent}. New contract ${riderAssignmentId} created.` : `${form.fullName} submitted to screening.`, unread: true, category: returningRider ? 'returning-rider' : 'task' },
+      ...current,
+    ]);
+    audit(returningRider ? 'Returning rider contract created' : 'Application submitted', returningRider ? `${form.fullName} linked from cleared account ${duplicate.cardId} under ${duplicateAgent} to new contract ${cardId}` : `${form.fullName} moved to screening`);
+    setRoute('riders');
+    return { success: true };
+  };
+
+  const installApp = async () => {
+    if (!deferredInstallPrompt) {
+      setInstallStatus('Open through localhost or HTTPS, then try again. Some browsers also show Install in the address bar.');
+      return;
+    }
+    deferredInstallPrompt.prompt();
+    const result = await deferredInstallPrompt.userChoice;
+    setDeferredInstallPrompt(null);
+    setInstallStatus(result.outcome === 'accepted' ? 'Installation started.' : 'Installation was dismissed.');
+  };
+
+  const lockSession = () => {
+    setSecurity((current) => ({ ...current, locked: true, unlockPin: '' }));
+    audit('Session locked', 'Agent locked the portal');
+  };
+
+  const unlockSession = () => {
+    setSecurity((current) => {
+      if (current.unlockPin === current.pin) {
+        return {
+          ...current,
+          locked: false,
+          unlockPin: '',
+          failedUnlocks: 0,
+          auditLog: [{ action: 'Session unlocked', details: 'PIN accepted', agent: agent.agentCode, time: new Date().toLocaleString() }, ...(current.auditLog || [])],
+        };
+      }
+      return {
+        ...current,
+        failedUnlocks: (current.failedUnlocks || 0) + 1,
+        auditLog: [{ action: 'Failed unlock', details: 'Wrong secure PIN entered', agent: agent.agentCode, time: new Date().toLocaleString() }, ...(current.auditLog || [])],
+      };
+    });
+  };
+
+  const downloadCsv = (filename, rows) => {
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportAuditCsv = () => {
+    downloadCsv('bumu-audit-trail.csv', [['Time', 'Agent', 'Action', 'Details'], ...(security.auditLog || []).map((entry) => [entry.time, entry.agent, entry.action, entry.details])]);
+  };
+
+  const resetDemoData = () => {
+    setCustomers(initialCustomers.map((c, index, current) => {
+      const assignedAgentCode = c.assignedAgentCode || c.agentCode || agent.agentCode;
+      const cardId = c.cardId || generateRiderCardId(assignedAgentCode, `${c.nationalId || c.phone || index}`, current);
+      const riderAssignmentId = c.riderAssignmentId || `ASN-${assignedAgentCode}-${checksum(`${cardId}:${c.id}`)}`;
+      const riderPersonId = c.riderPersonId || generateRiderPersonId(c);
+      const contractId = c.contractId || generateContractId(assignedAgentCode, `${cardId}:${c.id}`, current);
+      const risk = computeRisk(c);
+      const verifiedByDefault = c.status === 'Active' && risk < 60 && !c.flagged;
+      return {
+        ...c,
+        cardId,
+        riderPersonId,
+        contractId,
+        assignedAgentCode,
+        agentCode: assignedAgentCode,
+        registeredByAgentCode: c.registeredByAgentCode || assignedAgentCode,
+        riderAssignmentId,
+        contractStatus: c.contractStatus || (Number(c.remaining || 0) > 0 ? 'Active' : 'Cleared'),
+        contractSequence: c.contractSequence || 1,
+        verificationChecklist: {
+          idSeen: verifiedByDefault,
+          chassisConfirmed: verifiedByDefault,
+          passportPhoto: verifiedByDefault,
+          idFront: verifiedByDefault,
+          idBack: verifiedByDefault,
+          idScan: verifiedByDefault,
+          ...(c.verificationChecklist || {}),
+        },
+        risk,
+        flagged: risk >= 60,
+      };
+    }));
+    setCommissions(initialCommissions);
+    setNotifications(initialNotifications);
+    audit('Demo data reset', 'Restored default riders and commissions');
+  };
+
+  const themeStyles = theme === 'dark' ? styles.darkShell : styles.lightShell;
+  const activeRoute = routes.find((item) => item.id === route) || routes[0];
+  const activeLabel = activeRoute.label || 'Dashboard';
+  const commandResults = useMemo(() => {
+    const query = commandQuery.trim().toLowerCase();
+    if (!query) return [];
+    const routeResults = routes
+      .filter((item) => `${item.label} ${item.detail} ${item.action || ''}`.toLowerCase().includes(query))
+      .map((item) => ({ type: 'Module', label: item.label, detail: item.detail, routeId: item.id }));
+    const featureResults = Object.entries(featureMenus).flatMap(([routeId, features]) => features
+      .filter((feature) => `${feature.label} ${feature.detail}`.toLowerCase().includes(query))
+      .map((feature, index) => ({ type: 'Feature', label: feature.label, detail: feature.detail, routeId, toolIndex: index })));
+    const riderResults = customers
+      .filter((customer) => `${customer.name} ${customer.phone} ${customer.nationalId || ''} ${customer.cardId || ''} ${customer.contractId || ''}`.toLowerCase().includes(query))
+      .slice(0, 6)
+      .map((customer) => ({ type: 'Rider', label: customer.name, detail: `${customer.cardId} - ${customer.status} - KES ${Number(customer.remaining || 0).toLocaleString('en-KE')} balance`, routeId: 'riders', riderId: customer.id }));
+    const seen = new Set();
+    return [...routeResults, ...featureResults, ...riderResults].filter((item) => {
+      const key = `${item.type}:${item.label}:${item.routeId}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 8);
+  }, [commandQuery, customers]);
+  const openFeature = (id) => {
+    setRoute(id);
+    setNavMenuOpen(false);
+    setCommandRiderId(null);
+  };
+  const openHomeAction = (label) => {
+    const map = {
+      'Collect Payment': 'payments',
+      'Register Rider': 'register',
+      'Find Rider': 'riders',
+      'Verify Rider': 'riders',
+      'Transfer Rider': 'transfers',
+      'Record Visit': 'riders',
+    };
+    setRoute(map[label] || 'dashboard');
+    setNavMenuOpen(false);
+    setCommandRiderId(null);
+  };
+  const openCommandResult = (result) => {
+    setRoute(result.routeId);
+    setNavMenuOpen(false);
+    if (result.type === 'Feature') {
+      setCommandRiderId(null);
+    } else if (result.type === 'Rider') {
+      setCommandRiderId(result.riderId);
+    } else {
+      setCommandRiderId(null);
+    }
+    setCommandQuery('');
+  };
+  const activeInsight = useMemo(() => {
+    const openTasks = tasks.filter((item) => item.status !== 'Done').length;
+    const unreadAlerts = notifications.filter((item) => item.unread).length;
+    const pendingCommissions = commissions.filter((item) => item.status === 'Pending').length;
+    const flaggedRiders = customers.filter((item) => item.flagged || item.risk >= 60 || item.overdue).length;
+    const insights = {
+      dashboard: {
+        kicker: 'Live desk',
+        detail: `${customers.length} riders, ${openTasks} open follow-ups, and ${unreadAlerts} alerts waiting.`,
+        metric: `${openTasks} tasks`,
+      },
+      register: {
+        kicker: 'New application',
+        detail: `Defaults are ready for ${settings.defaultBikeModel} with ${settings.defaultInstallment}.`,
+        metric: settings.defaultRegion,
+      },
+      riders: {
+        kicker: 'Portfolio watch',
+        detail: `${flaggedRiders} rider accounts need closer attention before the next review.`,
+        metric: `${customers.length} riders`,
+      },
+      payments: {
+        kicker: 'Payment desk',
+        detail: `Collect payments, check payment dates, and update rider balances without leaving the rider account.`,
+        metric: `${customers.length} riders`,
+      },
+      transfers: {
+        kicker: 'Transfer control',
+        detail: `Review contracts, repair debt, previous agents, and transfer notes before any account moves.`,
+        metric: `${customers.length} records`,
+      },
+      commissions: {
+        kicker: 'Earnings desk',
+        detail: `${pendingCommissions} commission records are still pending reconciliation.`,
+        metric: `${commissions.length} records`,
+      },
+      notifications: {
+        kicker: 'Alert center',
+        detail: `${unreadAlerts} unread alerts are available for payments, documents, and tasks.`,
+        metric: `${unreadAlerts} unread`,
+      },
+      security: {
+        kicker: 'Security desk',
+        detail: `${security.privacyMode ? 'Privacy masking is on' : 'Privacy masking is off'} with ${(security.auditLog || []).length} audit events.`,
+        metric: security.locked ? 'Locked' : 'Open',
+      },
+      settings: {
+        kicker: 'Portal settings',
+        detail: `${settings.inAppNotifications ? 'In-app alerts are on' : 'In-app alerts are off'} and theme is ${theme === 'dark' ? 'dark' : 'light'}.`,
+        metric: settings.defaultRegion,
+      },
+      account: {
+        kicker: 'Agent account',
+        detail: `${agent.fullName} uses ${agent.agentCode}. Profile changes wait for admin approval.`,
+        metric: agent.agentCode,
+      },
+    };
+    return insights[route] || insights.dashboard;
+  }, [agent, commissions, customers, notifications, route, security, settings, tasks, theme]);
+  const portalStatus = useMemo(() => {
+    const openTasks = tasks.filter((item) => item.status !== 'Done').length;
+    const unreadAlerts = notifications.filter((item) => item.unread).length;
+    const riskyRiders = customers.filter((item) => item.flagged || item.overdue || Number(item.risk || 0) >= 60).length;
+    return [
+      { label: 'Agent', value: agent.agentCode },
+      { label: 'Open Tasks', value: openTasks },
+      { label: 'Unread Alerts', value: unreadAlerts },
+      { label: 'Risk Riders', value: riskyRiders },
+    ];
+  }, [agent.agentCode, customers, notifications, tasks]);
+  const visibleNavItems = navMenuOpen ? routes : [activeRoute];
+
+  if (!loggedIn) {
+    return <Auth agent={agent} onLogin={handleLogin} onRegister={handleRegisterAgent} theme={theme} />;
+  }
+
+  if (security.locked) {
+    return (
+      <SafeAreaView style={[styles.shell, themeStyles]}>
+        <View style={styles.lockCard}>
+          <Text style={[styles.brand, theme === 'dark' ? styles.textLight : styles.textDark]}>Session Locked</Text>
+          <Text style={[styles.pageSubtitle, theme === 'dark' ? styles.textMutedLight : styles.textMuted]}>Enter secure PIN to continue. Demo PIN is 1234 unless changed.</Text>
+          <TextInput
+            style={styles.lockInput}
+            value={security.unlockPin}
+            onChangeText={(value) => setSecurity((current) => ({ ...current, unlockPin: value }))}
+            secureTextEntry
+            keyboardType="number-pad"
+          />
+          {!!security.failedUnlocks && <Text style={styles.lockError}>Wrong PIN attempts: {security.failedUnlocks}</Text>}
+          <TouchableOpacity style={styles.actionButton} onPress={unlockSession}>
+            <Text style={styles.actionText}>Unlock Portal</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.shell, themeStyles]}>
+      <View style={styles.frame}>
+        <View style={[styles.topBar, theme === 'dark' ? styles.topBarDark : styles.topBarLight]}>
+          <View style={styles.headerAgentWrap}>
+            {agent.agentPhoto ? (
+              <Image source={{ uri: agent.agentPhoto }} style={styles.headerAgentPhoto} />
+            ) : (
+              <View style={styles.headerAgentInitial}>
+                <Text style={styles.headerAgentInitialText}>{String(agent.fullName || 'A').slice(0, 1).toUpperCase()}</Text>
+              </View>
+            )}
+            <View style={styles.headerAgentBlock}>
+              <Text style={styles.headerAgentLabel}>Agent</Text>
+              <Text style={styles.headerAgentCode}>{agent.agentCode}</Text>
+            </View>
+          </View>
+        </View>
+        <View style={[styles.commandBar, theme === 'dark' ? styles.commandBarDark : styles.commandBarLight]}>
+          <TextInput
+            style={styles.commandInput}
+            value={commandQuery}
+            onChangeText={setCommandQuery}
+            placeholder={isCompact ? 'Search rider, ID, payment...' : 'Command search: rider, ID, payment, overdue, change password...'}
+            placeholderTextColor={theme === 'dark' ? '#7f93a8' : '#8a97a8'}
+          />
+          {!!commandResults.length && (
+            <View style={[styles.commandResults, theme === 'dark' ? styles.commandResultsDark : styles.commandResultsLight]}>
+              {commandResults.map((result, index) => (
+                <TouchableOpacity key={`${result.type}-${result.label}-${index}`} style={styles.commandResultRow} onPress={() => openCommandResult(result)}>
+                  <Text style={styles.commandType}>{result.type}</Text>
+                  <View style={styles.commandCopy}>
+                    <Text style={[styles.commandTitle, theme === 'dark' ? styles.textLight : styles.textDark]}>{result.label}</Text>
+                    <Text style={[styles.commandDetail, theme === 'dark' ? styles.textMutedLight : styles.textMuted]}>{result.detail}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.workspace}>
+          <View style={[styles.navShell, theme === 'dark' ? styles.navShellDark : styles.navShellLight]}>
+            <View style={styles.navHelpBox}>
+              <View style={styles.navMenuHeader}>
+                <TouchableOpacity style={styles.hamburgerButton} onPress={() => setNavMenuOpen((open) => !open)} activeOpacity={0.86}>
+                  <View style={styles.hamburgerLine} />
+                  <View style={styles.hamburgerLine} />
+                  <View style={styles.hamburgerLine} />
+                </TouchableOpacity>
+                <Text style={styles.navEyebrow}>{navMenuOpen ? 'Main tabs' : 'Selected feature'}</Text>
+              </View>
+              {!navMenuOpen && (
+                <TouchableOpacity style={styles.backButton} onPress={() => setNavMenuOpen(true)} activeOpacity={0.86}>
+                  <Text style={styles.backIcon}>{'<'}</Text>
+                  <Text style={styles.backText}>Back to Main Tabs</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.navBar}>
+              <View style={styles.navGroup}>
+                {visibleNavItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.navItem, styles[`navTone${(index % 6) + 1}`], route === item.id && styles.navItemActive]}
+                    onPress={() => openFeature(item.id)}
+                    activeOpacity={0.86}
+                  >
+                    <View style={styles.navCopy}>
+                      <Text style={[styles.navText, route === item.id && styles.navTextActive]}>{item.label}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+          <View style={styles.contentPane}>
+            <View style={styles.pageHeader}>
+              <Text style={[styles.pageTitle, theme === 'dark' ? styles.textLight : styles.textDark]}>{activeLabel}</Text>
+              <View style={[styles.insightStrip, theme === 'dark' ? styles.insightStripDark : styles.insightStripLight]}>
+                <View style={styles.insightCopy}>
+                  <Text style={styles.insightKicker}>{activeInsight.kicker}</Text>
+                  <Text style={[styles.insightDetail, theme === 'dark' ? styles.textLight : styles.textDark]}>{activeInsight.detail}</Text>
+                </View>
+                <Text style={styles.insightMetric}>{activeInsight.metric}</Text>
+              </View>
+              <View style={[styles.colorLegend, theme === 'dark' ? styles.selectedToolPanelDark : styles.selectedToolPanelLight]}>
+                <Text style={styles.legendDone}>Green = done/paid</Text>
+                <Text style={styles.legendPending}>Yellow = pending</Text>
+                <Text style={styles.legendDanger}>Red = debt/blocked</Text>
+                <Text style={styles.legendInfo}>Blue = information</Text>
+              </View>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.pageContent} showsVerticalScrollIndicator={false}>
+              {activeRoute.screen === 'dashboard' && <Dashboard theme={theme} simpleMode={settings.simpleMode} selectedAction={activeRoute.action || ''} customers={customers} commissions={commissions} notifications={notifications} tasks={tasks} onCompleteTask={completeFollowUpTask} onHomeAction={openHomeAction} />}
+              {activeRoute.screen === 'register' && <RegisterRider theme={theme} selectedAction={activeRoute.action || ''} settings={settings} customers={customers} agent={agent} onSubmitRider={submitRider} />}
+              {activeRoute.screen === 'customers' && <Customers theme={theme} simpleMode={settings.simpleMode} commandRiderId={commandRiderId} selectedAction={activeRoute.action || ''} customers={customers} agent={agent} privacyMode={security.privacyMode} onExportCsv={downloadCsv} onAddPayment={addCustomerPayment} onCreateTask={addFollowUpTask} onSendMessage={sendRiderMessage} onAgentRecord={addCustomerAgentRecord} onChecklistChange={updateCustomerChecklist} />}
+              {activeRoute.screen === 'commissions' && <Commissions theme={theme} selectedAction={activeRoute.action || ''} commissions={commissions} customers={customers} onExportCsv={downloadCsv} />}
+              {activeRoute.screen === 'notifications' && <Notifications theme={theme} selectedAction={activeRoute.action || ''} notifications={notifications} onMarkAllRead={markNotificationsRead} onOpenNotification={toggleNotificationDetails} />}
+              {activeRoute.screen === 'security' && <Security theme={theme} selectedAction={activeRoute.action || ''} security={security} customers={customers} onTogglePrivacy={(value) => { setSecurity((current) => ({ ...current, privacyMode: value })); audit('Privacy mode', value ? 'Enabled rider masking' : 'Disabled rider masking'); }} onLock={lockSession} onChangePin={(pin) => { setSecurity((current) => ({ ...current, pin })); audit('PIN changed', 'Agent changed secure session PIN'); }} onExportAudit={exportAuditCsv} />}
+              {activeRoute.screen === 'profile' && <Profile theme={theme} selectedAction={activeRoute.action || ''} agent={agent} onUpdateAgent={handleUpdateAgent} onLogout={handleLogout} />}
+              {activeRoute.screen === 'settings' && <Settings theme={theme} selectedAction={activeRoute.action || ''} settings={settings} installStatus={installStatus} onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} onToggleSetting={updateSetting} onUpdateSetting={updateSetting} onInstallApp={installApp} onResetSession={() => { setRoute('dashboard'); audit('Session reset', 'Returned portal to dashboard'); }} onResetDemoData={resetDemoData} onChangePassword={handleChangePassword} passwordMessage={passwordMessage} />}
+            </ScrollView>
+          </View>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const createStyles = (theme, isDesktop, isCompact) => {
+  const dark = theme === 'dark';
+  return StyleSheet.create({
+    shell: {
+      flex: 1,
+      minHeight: '100vh',
+    },
+    frame: {
+      flex: 1,
+      width: '100%',
+      maxWidth: isDesktop ? 1260 : '100%',
+      alignSelf: 'center',
+      paddingBottom: 0,
+    },
+    lightShell: {
+      backgroundColor: '#ffffff',
+    },
+    darkShell: {
+      backgroundColor: '#ffffff',
+    },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: isCompact ? 'center' : 'flex-end',
+      paddingHorizontal: isCompact ? 12 : 16,
+      paddingTop: isCompact ? 10 : 18,
+      paddingBottom: isCompact ? 10 : 14,
+      borderBottomWidth: 1,
+      gap: isDesktop ? 0 : 12,
+    },
+    brandBlock: {
+      gap: 4,
+      flex: isDesktop ? 1 : undefined,
+      minWidth: 0,
+    },
+    headerAgentBlock: {
+      alignItems: 'flex-end',
+      gap: 3,
+      minWidth: 0,
+      flexShrink: 1,
+    },
+    headerAgentWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 10,
+      maxWidth: '100%',
+      minWidth: 0,
+    },
+    headerAgentPhoto: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      borderWidth: 2,
+      borderColor: '#8fff55',
+      backgroundColor: '#092a75',
+    },
+    headerAgentInitial: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      borderWidth: 2,
+      borderColor: '#8fff55',
+      backgroundColor: '#092a75',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerAgentInitialText: {
+      color: '#ffffff',
+      fontSize: 16,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+    },
+    headerAgentLabel: {
+      color: '#d7e7ff',
+      fontSize: 11,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+      textTransform: 'uppercase',
+    },
+    headerAgentCode: {
+      color: '#ffffff',
+      fontSize: isCompact ? 12 : 16,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+      flexShrink: 1,
+    },
+    brandSubtext: {
+      fontSize: 12,
+      lineHeight: 17,
+      fontFamily: 'Georgia',
+      maxWidth: 440,
+    },
+    portalStatusRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      justifyContent: isDesktop ? 'flex-end' : 'flex-start',
+      flex: isDesktop ? 1 : undefined,
+    },
+    portalStatusCard: {
+      minWidth: isCompact ? 92 : 112,
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+    },
+    portalStatusLight: {
+      backgroundColor: '#f5f8ff',
+      borderColor: '#d8e3f7',
+    },
+    portalStatusDark: {
+      backgroundColor: '#07101f',
+      borderColor: '#1a3158',
+    },
+    portalStatusLabel: {
+      color: '#0f5fff',
+      fontSize: 10,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+      textTransform: 'uppercase',
+    },
+    portalStatusValue: {
+      marginTop: 3,
+      fontSize: 12,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+    },
+    topBarLight: {
+      backgroundColor: '#0b4dcc',
+      borderBottomColor: '#2f7cff',
+    },
+    topBarDark: {
+      backgroundColor: '#061a4a',
+      borderBottomColor: '#2f7cff',
+    },
+    brand: {
+      fontSize: 20,
+      fontWeight: '800',
+      fontFamily: 'Georgia',
+    },
+    actions: {
+      flexDirection: 'row',
+      gap: 10,
+      justifyContent: 'flex-end',
+    },
+    modeButton: {
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: dark ? '#29406a' : '#d8e3f7',
+      backgroundColor: dark ? '#07101f' : '#f5f8ff',
+    },
+    modeText: {
+      color: dark ? '#f3f6fb' : '#0f5fff',
+      fontFamily: 'Georgia',
+      fontWeight: '900',
+      fontSize: 13,
+    },
+    actionButton: {
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+      backgroundColor: '#0f5fff',
+    },
+    commandBar: {
+      paddingHorizontal: isCompact ? 10 : 16,
+      paddingVertical: isCompact ? 8 : 10,
+      borderBottomWidth: 1,
+      zIndex: 5,
+    },
+    commandBarLight: {
+      backgroundColor: '#ffffff',
+      borderBottomColor: '#d8e3f7',
+    },
+    commandBarDark: {
+      backgroundColor: '#ffffff',
+      borderBottomColor: '#d8e3f7',
+    },
+    commandInput: {
+      borderWidth: 1,
+      borderColor: dark ? '#29406a' : '#d8e3f7',
+      borderRadius: isCompact ? 10 : 12,
+      paddingVertical: isCompact ? 10 : 12,
+      paddingHorizontal: isCompact ? 12 : 14,
+      color: '#0b1730',
+      backgroundColor: '#f8fafc',
+      fontFamily: 'Georgia',
+    },
+    commandResults: {
+      marginTop: 8,
+      borderWidth: 1,
+      borderRadius: 12,
+      overflow: 'hidden',
+    },
+    commandResultsLight: {
+      backgroundColor: '#ffffff',
+      borderColor: '#d8e3f7',
+    },
+    commandResultsDark: {
+      backgroundColor: '#07101f',
+      borderColor: '#1a3158',
+    },
+    commandResultRow: {
+      flexDirection: 'row',
+      gap: 10,
+      padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: dark ? '#1a3158' : '#edf2f7',
+    },
+    commandType: {
+      color: '#0f5fff',
+      fontSize: 11,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+      width: 58,
+    },
+    commandCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    commandTitle: {
+      fontSize: 13,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+    },
+    commandDetail: {
+      marginTop: 3,
+      fontSize: 12,
+      lineHeight: 17,
+      fontFamily: 'Georgia',
+    },
+    actionText: {
+      color: '#ffffff',
+      fontFamily: 'Georgia',
+      fontSize: 13,
+    },
+    workspace: {
+      flex: 1,
+      flexDirection: isCompact ? 'column' : 'row',
+      alignItems: 'stretch',
+      width: '100%',
+      backgroundColor: '#ffffff',
+    },
+    navShell: {
+      borderRightWidth: isCompact ? 0 : 1,
+      borderBottomWidth: isCompact ? 1 : 0,
+      paddingHorizontal: isCompact ? 10 : 14,
+      paddingVertical: isCompact ? 10 : 16,
+      gap: isCompact ? 10 : 16,
+      width: isCompact ? '100%' : 318,
+      maxHeight: isCompact ? undefined : 'calc(100vh - 74px)',
+      justifyContent: 'space-between',
+    },
+    insideShell: {
+      justifyContent: 'flex-start',
+    },
+    navShellLight: {
+      backgroundColor: '#063b9f',
+      borderBottomColor: '#2f7cff',
+    },
+    navShellDark: {
+      backgroundColor: '#063b9f',
+      borderBottomColor: '#2f7cff',
+    },
+    navBar: {
+      gap: 8,
+      flexDirection: 'column',
+      alignItems: 'stretch',
+      paddingBottom: isCompact ? 6 : 20,
+    },
+    navHelpBox: {
+      gap: 6,
+    },
+    navMenuHeader: {
+      minHeight: 40,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    hamburgerButton: {
+      width: 42,
+      height: 38,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: dark ? '#2f7cff' : '#76a5ff',
+      backgroundColor: dark ? '#07101f' : '#063b9f',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+    },
+    hamburgerLine: {
+      width: 19,
+      height: 2,
+      borderRadius: 999,
+      backgroundColor: '#ffffff',
+    },
+    navHelpText: {
+      fontSize: 12,
+      lineHeight: 17,
+      fontFamily: 'Georgia',
+    },
+    navGroup: {
+      gap: isCompact ? 4 : 7,
+    },
+    navGroupSwitch: {
+      gap: 8,
+      marginTop: 10,
+    },
+    navGroupButton: {
+      borderWidth: 1,
+      borderColor: dark ? '#1a3158' : '#d8e3f7',
+      backgroundColor: dark ? '#07101f' : '#ffffff',
+      borderRadius: 10,
+      paddingVertical: 11,
+      paddingHorizontal: 12,
+    },
+    navGroupButtonActive: {
+      backgroundColor: '#0f5fff',
+      borderColor: '#0f5fff',
+    },
+    navGroupButtonText: {
+      color: dark ? '#f3f6fb' : '#0b1730',
+      fontSize: 13,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+    },
+    navGroupButtonTextActive: {
+      color: '#ffffff',
+    },
+    navGroupTitle: {
+      fontSize: 11,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+      textTransform: 'uppercase',
+      paddingHorizontal: 4,
+      marginBottom: 2,
+    },
+    navItem: {
+      paddingVertical: isCompact ? 13 : 12,
+      paddingHorizontal: isCompact ? 10 : 4,
+      borderRadius: 0,
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      borderBottomWidth: 1,
+      borderColor: 'rgba(255,255,255,0.22)',
+      minHeight: isCompact ? 48 : 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      shadowColor: '#0f1720',
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      shadowOffset: { width: 0, height: 0 },
+    },
+    navCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    navTone1: {},
+    navTone2: {},
+    navTone3: {},
+    navTone4: {},
+    navTone5: {},
+    navTone6: {},
+    accountNav: {
+      gap: 9,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: dark ? '#1a3158' : '#d8e3f7',
+    },
+    accountNavItem: {
+      paddingVertical: 13,
+      paddingHorizontal: 13,
+      borderRadius: 10,
+      backgroundColor: dark ? '#11264b' : '#ffffff',
+      borderWidth: 1,
+      borderColor: dark ? '#29406a' : '#d8e3f7',
+      minHeight: 64,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    backButton: {
+      minHeight: 44,
+      borderRadius: 10,
+      backgroundColor: '#0f5fff',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    backIcon: {
+      color: '#ffffff',
+      fontSize: 18,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+      lineHeight: 20,
+    },
+    backText: {
+      color: '#ffffff',
+      fontSize: 13,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+    },
+    secondaryBackButton: {
+      minHeight: 42,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: dark ? '#29406a' : '#d8e3f7',
+      backgroundColor: dark ? '#07101f' : '#ffffff',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    secondaryBackText: {
+      color: dark ? '#f3f6fb' : '#0f5fff',
+      fontSize: 13,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+    },
+    insideHeader: {
+      borderBottomWidth: 1,
+      borderBottomColor: dark ? '#1a3158' : '#d8e3f7',
+      paddingBottom: 12,
+      gap: 5,
+    },
+    insideTitle: {
+      fontSize: 18,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+    },
+    navItemActive: {
+      backgroundColor: 'transparent',
+      borderColor: '#8fff55',
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      shadowOffset: { width: 0, height: 0 },
+    },
+    navText: {
+      fontSize: 13,
+      fontWeight: '700',
+      fontFamily: 'Georgia',
+      color: '#ffffff',
+      flexShrink: 1,
+    },
+    navDetail: {
+      marginTop: 3,
+      fontSize: 11,
+      lineHeight: 15,
+      fontFamily: 'Georgia',
+      color: dark ? '#aebbd0' : '#627083',
+      flexShrink: 1,
+    },
+    navNumber: {
+      color: dark ? '#aebbd0' : '#627083',
+      fontSize: 11,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+      width: 24,
+    },
+    navEyebrow: {
+      color: '#d7e7ff',
+      fontSize: 11,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+      textTransform: 'uppercase',
+      letterSpacing: 0,
+    },
+    navTextActive: {
+      color: '#8fff55',
+    },
+    workflowGuide: {
+      borderWidth: 1,
+      borderRadius: 14,
+      padding: 12,
+      gap: 9,
+      marginTop: 4,
+    },
+    workflowGuideLight: {
+      backgroundColor: '#ffffff',
+      borderColor: '#d8e3f7',
+    },
+    workflowGuideDark: {
+      backgroundColor: '#07101f',
+      borderColor: '#1a3158',
+    },
+    workflowHeader: {
+      borderBottomWidth: 1,
+      borderBottomColor: dark ? '#1a3158' : '#e6eef3',
+      paddingBottom: 8,
+      marginBottom: 1,
+      gap: 3,
+    },
+    workflowModule: {
+      fontSize: 15,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+    },
+    contentPane: {
+      flex: 1,
+      minWidth: 0,
+      backgroundColor: '#ffffff',
+    },
+    pageHeader: {
+      paddingHorizontal: isCompact ? 10 : 16,
+      paddingTop: isCompact ? 10 : 16,
+      paddingBottom: isCompact ? 12 : 20,
+      backgroundColor: '#ffffff',
+    },
+    pageTitle: {
+      fontSize: isDesktop ? 34 : isCompact ? 22 : 28,
+      fontWeight: '800',
+      fontFamily: 'Georgia',
+      maxWidth: isDesktop ? 820 : '100%',
+    },
+    pageSubtitle: {
+      marginTop: 8,
+      fontSize: 15,
+      lineHeight: 22,
+      maxWidth: isDesktop ? 760 : '100%',
+      fontFamily: 'Georgia',
+      opacity: 0.92,
+    },
+    insightStrip: {
+      marginTop: isCompact ? 10 : 14,
+      borderWidth: 1,
+      borderRadius: isCompact ? 10 : 14,
+      padding: isCompact ? 10 : 14,
+      flexDirection: isDesktop ? 'row' : 'column',
+      alignItems: isDesktop ? 'center' : 'stretch',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    insightStripLight: {
+      backgroundColor: '#ffffff',
+      borderColor: '#d8e3f7',
+    },
+    insightStripDark: {
+      backgroundColor: '#0b1730',
+      borderColor: '#29406a',
+    },
+    insightCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    insightKicker: {
+      color: '#0f5fff',
+      fontSize: 12,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+      textTransform: 'uppercase',
+    },
+    insightDetail: {
+      marginTop: 4,
+      fontSize: 15,
+      lineHeight: 22,
+      fontFamily: 'Georgia',
+    },
+    insightMetric: {
+      color: '#ffffff',
+      backgroundColor: '#0f5fff',
+      borderRadius: 12,
+      overflow: 'hidden',
+      paddingVertical: 9,
+      paddingHorizontal: 14,
+      fontSize: 13,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+      textAlign: 'center',
+      alignSelf: isDesktop ? 'center' : 'flex-start',
+    },
+    methodHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    methodCount: {
+      fontSize: 13,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+    },
+    selectedToolPanelLight: {
+      backgroundColor: '#f5f8ff',
+      borderColor: '#d8e3f7',
+    },
+    selectedToolPanelDark: {
+      backgroundColor: '#081326',
+      borderColor: '#29406a',
+    },
+    colorLegend: {
+      marginTop: isCompact ? 8 : 12,
+      borderWidth: 1,
+      borderRadius: isCompact ? 10 : 12,
+      padding: isCompact ? 8 : 12,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    legendDone: { color: '#0f5fff', fontSize: 11, fontWeight: '900', fontFamily: 'Georgia' },
+    legendPending: { color: '#b86800', fontSize: 11, fontWeight: '900', fontFamily: 'Georgia' },
+    legendDanger: { color: '#bd2a2a', fontSize: 11, fontWeight: '900', fontFamily: 'Georgia' },
+    legendInfo: { color: '#1f6fff', fontSize: 11, fontWeight: '900', fontFamily: 'Georgia' },
+    quickActions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginHorizontal: 16,
+      marginBottom: 16,
+    },
+    quickAction: {
+      backgroundColor: '#0f5fff',
+      borderRadius: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      flexGrow: 1,
+      flexBasis: '100%',
+    },
+    quickActionText: {
+      color: '#ffffff',
+      fontWeight: '800',
+      fontSize: 13,
+      fontFamily: 'Georgia',
+      textAlign: 'center',
+    },
+    pageContent: {
+      paddingHorizontal: isCompact ? 10 : 16,
+      paddingBottom: 32,
+      width: '100%',
+      backgroundColor: '#ffffff',
+    },
+    accountStack: {
+      gap: 18,
+    },
+    textDark: {
+      color: '#0b1730',
+    },
+    textLight: {
+      color: '#f3f6fb',
+    },
+    textMuted: {
+      color: '#627083',
+    },
+    textMutedLight: {
+      color: '#aebbd0',
+    },
+  });
+};
