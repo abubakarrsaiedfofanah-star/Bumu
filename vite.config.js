@@ -2,6 +2,7 @@ import { fileURLToPath, URL } from 'node:url';
 import react from '@vitejs/plugin-react';
 
 export default {
+  base: '/Bumu/',
   plugins: [react()],
   resolve: {
     alias: {
