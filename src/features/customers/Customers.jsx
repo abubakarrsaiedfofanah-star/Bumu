@@ -1,9 +1,9 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, ScrollView, Image } from 'react-native';
 import '../../../features/customers/customers.css';
 
 const filters = ['All', 'Active', 'Pending', 'Info Required', 'Overdue'];
-const detailTabs = ['Summary', 'Payments', 'Verify', 'Contracts', 'Repairs', 'History'];
+const detailTabs = ['Repairs', 'History'];
 const checklistItems = [
   ['idSeen', 'ID seen'],
   ['bikeSeen', 'Bike seen'],
@@ -56,7 +56,7 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('All');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [detailTab, setDetailTab] = useState('Summary');
+  const [detailTab, setDetailTab] = useState('Repairs');
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
   const [paymentMpesaCode, setPaymentMpesaCode] = useState('');
@@ -80,6 +80,9 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
   const [repairCost, setRepairCost] = useState('');
   const [repairDamage, setRepairDamage] = useState('');
   const [repairEvidence, setRepairEvidence] = useState('');
+  const [repairEvidencePreview, setRepairEvidencePreview] = useState('');
+  const [repairCamera, setRepairCamera] = useState(null);
+  const [repairEvidenceError, setRepairEvidenceError] = useState('');
   const [transferNote, setTransferNote] = useState('');
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
@@ -91,6 +94,7 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
   const [portfolioDateSearch, setPortfolioDateSearch] = useState(dateInputValue(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
   const [paymentView, setPaymentView] = useState('Day');
   const [portfolioBucket, setPortfolioBucket] = useState('All');
+  const repairVideoRef = useRef(null);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
@@ -140,11 +144,11 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
   useEffect(() => {
     if (!selectedCustomer || !selectedAction) return;
     const actionTab = {
-      'Open rider summary': 'Summary',
-      'Collect payment': 'Payments',
-      'Work payment calendar': 'Payments',
-      'Verify evidence': 'Verify',
-      'Track contracts and repairs': 'Contracts',
+      'Open rider summary': 'Repairs',
+      'Collect payment': 'Repairs',
+      'Work payment calendar': 'Repairs',
+      'Verify evidence': 'Repairs',
+      'Track contracts and repairs': 'Repairs',
     };
     if (actionTab[selectedAction]) setDetailTab(actionTab[selectedAction]);
   }, [selectedAction, selectedCustomer]);
@@ -154,7 +158,7 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
     const rider = agentCustomers.find((customer) => customer.id === commandRiderId);
     if (rider) {
       setSelectedCustomer(rider);
-      setDetailTab('Summary');
+      setDetailTab('Repairs');
     }
   }, [agentCustomers, commandRiderId]);
 
@@ -492,12 +496,117 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
       amount: cost,
       damage: repairDamage,
       fileName: repairEvidence,
+      evidencePreview: repairEvidencePreview,
       status: 'Pending approval',
       detail: `Pending repair debt ${formatKes(cost)} for ${repairDamage}${repairEvidence ? ` - evidence ${repairEvidence}` : ''}`,
     });
     setRepairCost('');
     setRepairDamage('');
     setRepairEvidence('');
+    setRepairEvidencePreview('');
+  };
+
+  const pickRepairEvidenceUpload = () => {
+    setRepairEvidenceError('');
+    if (typeof document === 'undefined') {
+      setRepairEvidenceError('Upload is only available in the browser app.');
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      setRepairEvidence(file.name);
+      const reader = new FileReader();
+      reader.onload = () => setRepairEvidencePreview(String(reader.result || ''));
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  };
+
+  const openRepairEvidenceCaptureFallback = () => {
+    setRepairEvidenceError('');
+    if (typeof document === 'undefined') {
+      setRepairEvidenceError('Camera is not available on this device.');
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.setAttribute('capture', 'environment');
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+    const cleanup = () => input.remove();
+    input.onchange = (event) => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        setRepairEvidenceError('No photo was selected.');
+        cleanup();
+        return;
+      }
+      setRepairEvidence(file.name || `Repair evidence ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setRepairEvidencePreview(String(reader.result || ''));
+        setRepairEvidenceError('');
+        cleanup();
+      };
+      reader.readAsDataURL(file);
+    };
+    input.oncancel = cleanup;
+    input.click();
+  };
+
+  const closeRepairCamera = () => {
+    repairCamera?.stream?.getTracks?.().forEach((track) => track.stop());
+    setRepairCamera(null);
+  };
+
+  useEffect(() => () => {
+    repairCamera?.stream?.getTracks?.().forEach((track) => track.stop());
+  }, [repairCamera]);
+
+  const openRepairEvidenceCamera = async () => {
+    setRepairEvidenceError('');
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      setRepairEvidenceError('Live camera is not available in this browser. Use Upload Photo for existing images.');
+      return;
+    }
+    try {
+      closeRepairCamera();
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+      setRepairCamera({ stream });
+      setTimeout(() => {
+        if (repairVideoRef.current) repairVideoRef.current.srcObject = stream;
+      }, 0);
+    } catch {
+      setRepairEvidenceError('Live camera is blocked. Allow camera permission in the browser, then tap Snap Photo again.');
+    }
+  };
+
+  const snapRepairEvidence = () => {
+    const video = repairVideoRef.current;
+    if (!video) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 720;
+    canvas.height = video.videoHeight || 540;
+    canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    setRepairEvidence(`Repair evidence ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+    setRepairEvidencePreview(canvas.toDataURL('image/jpeg', 0.86));
+    closeRepairCamera();
+  };
+
+  const createRiderTask = (customer, title, note) => {
+    onCreateTask(customer.id, title, note);
+    setMessageStatus(`Task created: ${title}`);
   };
 
   const requestTransfer = (customer) => {
@@ -682,13 +791,11 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
                 <Text style={styles.nextActionText}>{nextAction}</Text>
               </View>
               <View style={styles.nextActionButtons}>
-                <TouchableOpacity style={styles.nextActionButton} onPress={() => setDetailTab(customer.overdue ? 'Payments' : !idMatched || !bikeVerified ? 'Verify' : 'History')}>
-                  <Text style={styles.nextActionButtonText}>Open action</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.nextActionButtonAlt} onPress={() => onCreateTask(customer.id, nextAction, `System next action for ${customer.name}`)}>
+                <TouchableOpacity style={styles.nextActionButtonAlt} onPress={() => createRiderTask(customer, nextAction, `System next action for ${customer.name}`)}>
                   <Text style={styles.nextActionButtonAltText}>Create task</Text>
                 </TouchableOpacity>
               </View>
+              {!!messageStatus && <Text style={styles.messageStatus}>{messageStatus}</Text>}
               <View style={styles.statusBadgeRow}>
                 <Text style={[styles.miniBadge, idMatched ? styles.goodBadge : styles.pendingBadge]}>{idMatched ? 'ID matched' : 'ID pending'}</Text>
                 <Text style={[styles.miniBadge, bikeVerified ? styles.goodBadge : styles.pendingBadge]}>{bikeVerified ? 'Bike verified' : 'Bike check'}</Text>
@@ -707,9 +814,6 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
             <View style={styles.promiseTracker}>
               <Text style={styles.toolTitle}>Promise Tracker</Text>
               <Text style={styles.subtle}>Open promises: {openPromises} | Due today: {promisesDueToday} | Broken: {brokenPromises}</Text>
-              {!!openPromises && <TouchableOpacity style={styles.nextActionButtonAlt} onPress={() => setDetailTab('Verify')}>
-                <Text style={styles.nextActionButtonAltText}>Open promise tools</Text>
-              </TouchableOpacity>}
             </View>
 
             {(linkedContracts.length || customer.overdue || excuseCount || brokenPromises || !idMatched || !bikeVerified) ? (
@@ -731,10 +835,6 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
                     <Text style={[styles.detailTabText, detailTab === tab && styles.detailTabTextActive]}>{tab}</Text>
                     <Text style={[styles.detailTabHint, detailTab === tab && styles.detailTabHintActive]}>
                       {{
-                        Summary: 'Rider profile',
-                        Payments: 'Money and dates',
-                        Verify: 'Checks and evidence',
-                        Contracts: 'Old and linked records',
                         Repairs: 'Damage debt requests',
                         History: 'Agent notes',
                       }[tab]}
@@ -864,7 +964,7 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
               <View style={styles.agentBox}>
                 <Text style={styles.toolTitle}>Agent ID Scan / Capture</Text>
                 <TouchableOpacity style={styles.captureButton} onPress={pickIdCardImage}>
-                  <Text style={styles.captureButtonText}>Snap / Upload ID Card</Text>
+                  <Text style={styles.captureButtonText}>📷 Snap / Upload ID Card</Text>
                 </TouchableOpacity>
                 {!!scanImageUri && <Image source={{ uri: scanImageUri }} style={styles.scanPreview} resizeMode="cover" />}
                 {!!scanStatus && <Text style={styles.messageStatus}>{scanStatus}</Text>}
@@ -988,7 +1088,39 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
                 <View style={styles.agentBoxWide}>
                   <TextInput style={styles.input} placeholder="Repair cost" value={repairCost} onChangeText={setRepairCost} keyboardType="number-pad" />
                   <TextInput style={styles.input} placeholder="Damage description" value={repairDamage} onChangeText={setRepairDamage} />
-                  <TextInput style={styles.input} placeholder="Evidence photo/file" value={repairEvidence} onChangeText={setRepairEvidence} />
+                  <View style={styles.repairEvidenceBox}>
+                    <Text style={styles.toolTitle}>Repair evidence photo</Text>
+                    <Text style={styles.subtle}>{repairEvidence || 'Upload chooses an existing photo. Snap Photo opens the device camera.'}</Text>
+                    {!!repairEvidencePreview && <Image source={{ uri: repairEvidencePreview }} style={styles.repairEvidencePreview} />}
+                    <View style={styles.evidenceActions}>
+                      <TouchableOpacity style={styles.captureButton} onPress={pickRepairEvidenceUpload}>
+                        <Text style={styles.captureButtonText}>Upload Photo</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.actionButton} onPress={openRepairEvidenceCamera}>
+                        <Text style={styles.actionText}>📷 Snap Photo</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {!!repairCamera && (
+                      <View style={styles.repairCameraPanel}>
+                        {React.createElement('video', {
+                          ref: repairVideoRef,
+                          autoPlay: true,
+                          playsInline: true,
+                          muted: true,
+                          style: styles.repairCameraPreview,
+                        })}
+                        <View style={styles.evidenceActions}>
+                          <TouchableOpacity style={styles.actionButton} onPress={snapRepairEvidence}>
+                            <Text style={styles.actionText}>📷 Use Photo</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.captureButton} onPress={closeRepairCamera}>
+                            <Text style={styles.captureButtonText}>📷 Close Camera</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+                    {!!repairEvidenceError && <Text style={styles.error}>{repairEvidenceError}</Text>}
+                  </View>
                   <View style={styles.balancePreview}>
                     <Text style={styles.subtle}>Current balance: {formatKes(payment.remaining)}</Text>
                     <Text style={styles.subtle}>Pending repair debt: {formatKes(pendingRepairDebt + repairAmount)}</Text>
@@ -1005,6 +1137,7 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
                     <View key={item.id} style={styles.noteRow}>
                       <Text style={styles.noteTitle}>{item.damage || 'Repair request'} - {formatKes(item.amount)}</Text>
                       <Text style={styles.subtle}>{item.detail}</Text>
+                      {!!item.evidencePreview && <Image source={{ uri: item.evidencePreview }} style={styles.repairEvidencePreview} />}
                       <Text style={styles.noteMeta}>{item.status || 'Pending approval'} | {item.time}</Text>
                     </View>
                   )) : <Text style={styles.subtle}>No repair requests captured yet.</Text>}
@@ -1225,7 +1358,7 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
         </View>
       </View>}
 
-      {(!selectedAction || isPaymentCalendar || isPaymentsHub) && <View style={styles.portfolioCalendar}>
+      {(isPaymentCalendar || isPaymentsHub) && <View style={styles.portfolioCalendar}>
         <View style={styles.calendarHeader}>
           <View>
             <Text style={styles.sectionTitle}>Payment Workflow Calendar</Text>
@@ -1297,7 +1430,6 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={styles.subtle}>Showing {visiblePortfolioRows.length} real rider record{visiblePortfolioRows.length === 1 ? '' : 's'} for {portfolioBucket}.</Text>
           {visiblePortfolioRows.length ? visiblePortfolioRows.map((row) => (
             <TouchableOpacity
               key={row.id}
@@ -1306,7 +1438,7 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
                 const rider = agentCustomers.find((customer) => customer.id === row.customerId);
                 if (rider) {
                   setSelectedCustomer(rider);
-                  setDetailTab(row.bucket === 'Paid' || row.bucket === 'Debt Due' || row.bucket === 'Overdue' ? 'Payments' : 'Summary');
+                setDetailTab('Repairs');
                 }
               }}
             >
@@ -1344,27 +1476,12 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
               || (item.phone && cleanPhone(customer.phone) === cleanPhone(item.phone))
             )
           )).length;
-          const quickActions = isPaymentsHub || isCollectPayment
-            ? [['Record Payment', 'Payments']]
-            : isVerification
-              ? [['Open Verification', 'Verify']]
-              : isTransfer
-                ? [['Review Transfer', 'Contracts']]
-                : [
-                  ['Open Summary', 'Summary'],
-                  ['Record Payment', 'Payments'],
-                  ['Verify', 'Verify'],
-                  ['Transfer', 'Contracts'],
-                ];
           return (
             <TouchableOpacity
               style={styles.card}
               onPress={() => {
                 setSelectedCustomer(item);
-                if (selectedAction === 'Collect payment' || selectedAction === 'Work payment calendar' || selectedAction === 'Payments hub') setDetailTab('Payments');
-                else if (selectedAction === 'Verify evidence') setDetailTab('Verify');
-                else if (selectedAction === 'Track contracts and repairs') setDetailTab('Contracts');
-                else setDetailTab('Summary');
+                setDetailTab('Repairs');
               }}
               activeOpacity={0.86}
             >
@@ -1447,21 +1564,6 @@ export default function Customers({ theme, simpleMode = false, commandRiderId = 
                   </View>
                 </>
               )}
-              <View style={styles.quickOpenRow}>
-                {quickActions.map(([label, tab]) => (
-                  <TouchableOpacity
-                    key={label}
-                    style={styles.quickOpenButton}
-                    onPress={(event) => {
-                      event?.stopPropagation?.();
-                      setSelectedCustomer(item);
-                      setDetailTab(tab);
-                    }}
-                  >
-                    <Text style={styles.quickOpenText}>{label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
             </TouchableOpacity>
           );
         }}
@@ -1601,6 +1703,11 @@ const createStyles = (theme) => {
     smallInput: { flex: 1, minWidth: 90, borderWidth: 1, borderColor: dark ? '#334155' : '#dce3ea', borderRadius: 10, padding: 11, color: dark ? '#f8fafc' : '#0f1720', backgroundColor: dark ? '#030814' : '#ffffff', fontFamily: 'Georgia' },
     actionButton: { backgroundColor: '#0f5fff', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12, alignItems: 'center' },
     actionText: { color: '#ffffff', fontSize: 12, fontWeight: '900', fontFamily: 'Georgia' },
+    repairEvidenceBox: { borderRadius: 10, borderWidth: 1, borderColor: dark ? '#26364a' : '#e6eef4', backgroundColor: dark ? '#111b24' : '#ffffff', padding: 10, gap: 8 },
+    repairEvidencePreview: { width: '100%', height: 180, borderRadius: 10, borderWidth: 1, borderColor: dark ? '#334155' : '#dce3ea', objectFit: 'cover' },
+    evidenceActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    repairCameraPanel: { borderRadius: 10, borderWidth: 1, borderColor: dark ? '#334155' : '#dce3ea', backgroundColor: dark ? '#030814' : '#f8fafc', padding: 10, gap: 8 },
+    repairCameraPreview: { width: '100%', maxHeight: 260, borderRadius: 10, backgroundColor: '#000000' },
     balancePreview: { borderRadius: 10, borderWidth: 1, borderColor: dark ? '#26364a' : '#e6eef4', backgroundColor: dark ? '#111b24' : '#ffffff', padding: 10, gap: 3 },
     projectedText: { color: '#0f5fff', fontSize: 13, fontWeight: '900', fontFamily: 'Georgia' },
     captureButton: { backgroundColor: dark ? '#223044' : '#edf3ff', borderRadius: 10, borderWidth: 1, borderColor: dark ? '#334155' : '#dce3ea', paddingVertical: 11, paddingHorizontal: 12, alignItems: 'center' },

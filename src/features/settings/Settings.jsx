@@ -7,14 +7,10 @@ export default function Settings({
   selectedAction = '',
   settings = {},
   passwordMessage = '',
-  installStatus,
   onToggleTheme,
   onToggleSetting,
   onUpdateSetting,
   onChangePassword,
-  onInstallApp,
-  onResetSession,
-  onResetDemoData,
 }) {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [password, setPassword] = React.useState({ current: '', next: '', confirm: '' });
@@ -71,29 +67,6 @@ export default function Settings({
         ))}
       </View>}
 
-      {show('Install portal') && <View style={styles.sectionCard}>
-        <Text style={styles.sectionHeading}>App Installation</Text>
-        <Text style={styles.noteText}>Install the portal as an app when your browser allows it. Localhost and HTTPS are supported.</Text>
-        <View style={styles.installStatus}>
-          <Text style={styles.installText}>{installStatus}</Text>
-        </View>
-        <TouchableOpacity style={styles.optionButton} onPress={onInstallApp}>
-          <Text style={styles.optionLabel}>Install App</Text>
-        </TouchableOpacity>
-      </View>}
-
-      {show('Reset workspace') && <View style={[styles.sectionCard, styles.dangerCard]}>
-        <Text style={styles.sectionHeading}>Reset Tools</Text>
-        <Text style={styles.noteText}>Use these when testing the portal locally.</Text>
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.secondaryButton} onPress={onResetSession}>
-            <Text style={styles.secondaryText}>Reset Session</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.dangerButton} onPress={onResetDemoData}>
-            <Text style={styles.dangerText}>Reset Demo Data</Text>
-          </TouchableOpacity>
-        </View>
-      </View>}
     </ScrollView>
   );
 }
@@ -105,7 +78,6 @@ const createStyles = (theme) => {
     content: { paddingVertical: 16, paddingBottom: 48 },
     title: { fontSize: 24, fontWeight: '800', color: dark ? '#f3f6fb' : '#0b1730', marginBottom: 18, paddingHorizontal: 16, fontFamily: 'Georgia' },
     sectionCard: { backgroundColor: dark ? '#092a75' : '#f5f8ff', borderRadius: 14, padding: 18, marginBottom: 16, marginHorizontal: 16, borderWidth: 1, borderColor: dark ? '#183054' : '#e7eef4' },
-    dangerCard: { borderColor: dark ? '#5d2c2c' : '#f3caca' },
     sectionHeading: { fontSize: 16, fontWeight: '800', color: dark ? '#f3f6fb' : '#0b1730', marginBottom: 14, fontFamily: 'Georgia' },
     optionButton: { backgroundColor: '#0f5fff', borderRadius: 10, paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', alignSelf: 'flex-start' },
     optionLabel: { color: '#ffffff', fontSize: 14, fontWeight: '800', fontFamily: 'Georgia' },
@@ -128,12 +100,5 @@ const createStyles = (theme) => {
     pendingBox: { borderWidth: 1, borderColor: '#f3b949', borderRadius: 10, padding: 12, marginBottom: 12, backgroundColor: dark ? '#2a2112' : '#fff8e6' },
     reviewTitle: { color: dark ? '#f3f6fb' : '#0b1730', fontWeight: '800', marginBottom: 4, fontFamily: 'Georgia' },
     templateItem: { borderWidth: 1, borderColor: dark ? '#27364a' : '#e6eef3', borderRadius: 10, padding: 12, marginBottom: 10 },
-    installStatus: { backgroundColor: dark ? '#030814' : '#f4f8f7', borderRadius: 10, padding: 12, marginBottom: 12 },
-    installText: { color: dark ? '#f3f6fb' : '#0b1730', fontFamily: 'Georgia', fontSize: 13 },
-    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    secondaryButton: { backgroundColor: dark ? '#223044' : '#edf3ff', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 16 },
-    secondaryText: { color: dark ? '#f3f6fb' : '#0f5fff', fontWeight: '800', fontFamily: 'Georgia' },
-    dangerButton: { backgroundColor: '#b42318', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 16 },
-    dangerText: { color: '#ffffff', fontWeight: '800', fontFamily: 'Georgia' },
   });
 };

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import '../../../features/auth/auth.css';
 
-export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
+export default function Auth({ agent, onLogin, onRegister, onResetPassword = () => false, theme = 'light' }) {
   const [mode, setMode] = useState('login');
   const [fullName, setFullName] = useState('');
   const [nationalId, setNationalId] = useState('');
@@ -24,15 +24,12 @@ export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const isRegistering = mode === 'register';
+  const isForgotPassword = mode === 'forgot';
 
   const handleLogin = async () => {
     setMessage('');
     if (!email || !password) {
       setMessage('Enter your email and password to continue.');
-      return;
-    }
-    if (!adminCodeVerified) {
-      setMessage('Verify the admin login code first.');
       return;
     }
 
@@ -46,6 +43,40 @@ export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
       }
       setLoading(false);
     }, 900);
+  };
+
+  const handleResetPassword = async () => {
+    setMessage('');
+    if (!email || !adminCode || !password || !confirmPassword) {
+      setMessage('Enter email, admin OTP, and the new password.');
+      return;
+    }
+    if (adminCode !== '123456') {
+      setMessage('Enter the 6-digit code sent by admin.');
+      return;
+    }
+    if (password.length < 6) {
+      setMessage('Use at least 6 characters for the password.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setMessage('Passwords do not match.');
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => {
+      const success = onResetPassword(email, password);
+      setLoading(false);
+      if (!success) {
+        setMessage('No approved agent account found for that email.');
+        return;
+      }
+      setMessage('Password reset. Sign in with the new password.');
+      setMode('login');
+      setAdminCode('');
+      setPassword('');
+      setConfirmPassword('');
+    }, 700);
   };
 
   const handleRegister = async () => {
@@ -82,6 +113,15 @@ export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
 
   const switchMode = () => {
     setMode((current) => (current === 'login' ? 'register' : 'login'));
+    setMessage('');
+    setPassword('');
+    setConfirmPassword('');
+    setAdminCode('');
+    setAdminCodeVerified(false);
+  };
+
+  const openForgotPassword = () => {
+    setMode('forgot');
     setMessage('');
     setPassword('');
     setConfirmPassword('');
@@ -127,7 +167,7 @@ export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
         if (videoRef.current) videoRef.current.srcObject = stream;
       }, 0);
     } catch {
-      setCameraError('Camera permission was blocked or no camera was found.');
+      setCameraError('Camera did not open. Use Upload instead.');
     }
   };
 
@@ -156,7 +196,7 @@ export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
             <Text style={styles.documentButtonText}>Upload</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.documentButtonAlt} onPress={() => openAgentCamera(setter, label, /photo/i.test(label) ? 'user' : 'environment')} disabled={loading}>
-            <Text style={styles.documentButtonAltText}>Scan / Camera</Text>
+            <Text style={styles.documentButtonAltText}>📷 Scan / Camera</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -174,7 +214,11 @@ export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
       <View style={styles.loginCard}>
         <Text style={styles.title}>BUMU Agent Portal</Text>
         <Text style={styles.subtitle}>
-          {isRegistering ? 'Create your agent account. Admin must approve it before access is allowed.' : 'Secure access for approved BUMU agents.'}
+          {isRegistering
+            ? 'Create your agent account. Admin must approve it before access is allowed.'
+            : isForgotPassword
+              ? 'Reset password with the OTP sent by admin.'
+              : 'Secure access for approved BUMU agents.'}
         </Text>
 
         {isRegistering && (
@@ -209,9 +253,9 @@ export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
               onChangeText={setRegion}
               editable={!loading}
             />
-            <AgentDocument label="Agent photo" value={agentPhoto} setter={setAgentPhoto} />
-            <AgentDocument label="Agent ID front" value={agentIdFront} setter={setAgentIdFront} />
-            <AgentDocument label="Agent ID back" value={agentIdBack} setter={setAgentIdBack} />
+            <AgentDocument label="Passport photo" value={agentPhoto} setter={setAgentPhoto} />
+            <AgentDocument label="National ID front photo" value={agentIdFront} setter={setAgentIdFront} />
+            <AgentDocument label="National ID back photo" value={agentIdBack} setter={setAgentIdBack} />
           </>
         )}
 
@@ -225,17 +269,17 @@ export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
         />
         <TextInput
           style={styles.input}
-          placeholder="Password"
+          placeholder={isForgotPassword ? 'New password' : 'Password'}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           editable={!loading}
         />
 
-        {isRegistering && (
+        {(isRegistering || isForgotPassword) && (
           <TextInput
             style={styles.input}
-            placeholder="Confirm password"
+            placeholder={isForgotPassword ? 'Confirm new password' : 'Confirm password'}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry
@@ -243,11 +287,11 @@ export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
           />
         )}
 
-        {!isRegistering && (
+        {isForgotPassword && (
           <View style={styles.otpBox}>
             <TextInput
               style={styles.otpInput}
-              placeholder="Admin login code"
+              placeholder="Admin OTP"
               value={adminCode}
               onChangeText={setAdminCode}
               maxLength={6}
@@ -256,14 +300,14 @@ export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
             />
             <View style={styles.otpActions}>
               <TouchableOpacity style={[styles.otpButton, adminCodeVerified && styles.otpVerified]} onPress={verifyAdminCode} disabled={loading}>
-                <Text style={styles.otpButtonText}>{adminCodeVerified ? 'Verified' : 'Verify Admin Code'}</Text>
+                <Text style={styles.otpButtonText}>{adminCodeVerified ? 'Verified' : 'Verify Admin OTP'}</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
 
         {!!message && <Text style={styles.message}>{message}</Text>}
-        {!!cameraError && <Text style={styles.message}>{cameraError}</Text>}
+        {isRegistering && !!cameraError && <Text style={styles.message}>{cameraError}</Text>}
         {!!cameraTarget && (
           <View style={styles.cameraPanel}>
             <Text style={styles.documentLabel}>Camera: {cameraTarget.label}</Text>
@@ -276,10 +320,10 @@ export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
             })}
             <View style={styles.documentActions}>
               <TouchableOpacity style={styles.documentButton} onPress={snapAgentPhoto}>
-                <Text style={styles.documentButtonText}>Snap Photo</Text>
+                <Text style={styles.documentButtonText}>📷 Snap Photo</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.documentButtonAlt} onPress={closeCamera}>
-                <Text style={styles.documentButtonAltText}>Close Camera</Text>
+                <Text style={styles.documentButtonAltText}>📷 Close Camera</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -287,15 +331,21 @@ export default function Auth({ agent, onLogin, onRegister, theme = 'light' }) {
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={isRegistering ? handleRegister : handleLogin}
+          onPress={isRegistering ? handleRegister : isForgotPassword ? handleResetPassword : handleLogin}
           disabled={loading}
         >
-          <Text style={styles.buttonText}>{loading ? 'Please wait...' : isRegistering ? 'Create account' : 'Sign in'}</Text>
+          <Text style={styles.buttonText}>{loading ? 'Please wait...' : isRegistering ? 'Create account' : isForgotPassword ? 'Reset Password' : 'Sign in'}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.switchButton} onPress={switchMode} disabled={loading}>
+        {!isRegistering && !isForgotPassword && (
+          <TouchableOpacity style={styles.switchButton} onPress={openForgotPassword} disabled={loading}>
+            <Text style={styles.switchText}>Forgot password?</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity style={styles.switchButton} onPress={isForgotPassword ? () => setMode('login') : switchMode} disabled={loading}>
           <Text style={styles.switchText}>
-            {isRegistering ? 'Already have an account? Sign in' : 'New agent? Register here'}
+            {isForgotPassword ? 'Back to sign in' : isRegistering ? 'Already have an account? Sign in' : 'New agent? Register here'}
           </Text>
         </TouchableOpacity>
       </View>

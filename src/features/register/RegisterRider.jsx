@@ -8,11 +8,8 @@ const emptyForm = (settings = {}) => ({
   fullName: '',
   nationalId: '',
   phone: '',
-  riderCardId: '',
-  dob: '',
   gender: '',
   location: settings.defaultRegion || 'Nairobi',
-  occupation: '',
   passport: '',
   passportPreview: '',
   idFront: '',
@@ -51,6 +48,9 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
   const [lastSavedAt, setLastSavedAt] = useState('');
   const [cameraTarget, setCameraTarget] = useState(null);
   const [cameraError, setCameraError] = useState('');
+  const [kinOtp, setKinOtp] = useState('');
+  const [kinOtpSent, setKinOtpSent] = useState(false);
+  const [kinConsent, setKinConsent] = useState('');
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -74,7 +74,6 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
   const duplicateMatches = customers.filter((customer) => (
     (form.nationalId && clean(customer.nationalId) === clean(form.nationalId))
     || (form.phone && cleanPhone(customer.phone) === cleanPhone(form.phone))
-    || (form.riderCardId && clean(customer.cardId || customer.customerCardId) === clean(form.riderCardId))
     || (form.chassis && clean(customer.chassis) === clean(form.chassis))
   ));
 
@@ -84,12 +83,17 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
       if (!String(form[key] || '').trim()) next[key] = `${label} is required`;
     };
     if (targetStep === 0) {
-      ['fullName', 'nationalId', 'phone', 'dob', 'gender', 'location', 'occupation'].forEach((key) => required(key, key.replace(/([A-Z])/g, ' $1')));
+      ['fullName', 'nationalId', 'phone', 'gender', 'location'].forEach((key) => required(key, key.replace(/([A-Z])/g, ' $1')));
       if (form.phone && !/^(?:\+254|254|0)(?:7|1)\d{8}$/.test(String(form.phone).replace(/[\s-]/g, ''))) next.phone = 'Use +2547..., +2541..., 07..., or 01...';
       if (form.nationalId && !/^\d{7,8}$/.test(form.nationalId.trim())) next.nationalId = 'National ID should be 7 to 8 digits';
     }
     if (targetStep === 1) ['passport', 'idFront', 'idBack', 'idScan'].forEach((key) => required(key, key.replace(/([A-Z])/g, ' $1')));
     if (targetStep === 2) ['kinName', 'kinPhone', 'relationship'].forEach((key) => required(key, key.replace(/([A-Z])/g, ' $1')));
+    if (targetStep === 2) {
+      if (!kinOtpSent) next.kinOtp = 'Send OTP to next of kin first';
+      if (kinOtpSent && kinOtp !== '123456') next.kinOtp = 'Enter the OTP sent to next of kin';
+      if (kinOtp === '123456' && kinConsent !== 'yes') next.kinConsent = 'Next of kin must approve with Yes';
+    }
     if (targetStep === 3) ['bikeModel', 'chassis', 'deposit', 'installment'].forEach((key) => required(key, key.replace(/([A-Z])/g, ' $1')));
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -112,10 +116,13 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
       return;
     }
     setForm(emptyForm(settings));
+    setKinOtp('');
+    setKinOtpSent(false);
+    setKinConsent('');
     setStep(0);
   };
 
-  const Field = ({ name, label, type = 'default' }) => (
+  const renderField = (name, label, type = 'default') => (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput style={styles.input} value={form[name]} onChangeText={(value) => update(name, value)} keyboardType={type} />
@@ -123,75 +130,97 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
     </View>
   );
 
-  const pickDocument = (name, label, mode = 'upload') => {
-    if (typeof document === 'undefined') {
-      update(name, `${label} ${mode === 'scan' ? 'scanned' : 'captured'}`);
-      return;
-    }
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = mode === 'scan' ? 'image/*' : 'image/*,.pdf';
-    if (mode === 'scan') input.capture = 'environment';
-    input.onchange = (event) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      update(name, `${mode === 'scan' ? 'Scanned' : 'Uploaded'}: ${file.name}`);
-      if (file.type?.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = () => update(`${name}Preview`, reader.result || '');
-        reader.readAsDataURL(file);
-      }
-    };
-    input.click();
-  };
-
   const closeCamera = () => {
     cameraTarget?.stream?.getTracks?.().forEach((track) => track.stop());
     setCameraTarget(null);
   };
 
+  const openCaptureFallback = (name, label, facingMode = 'environment') => {
+    if (typeof document === 'undefined') {
+      setCameraError('Camera is not available on this device.');
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.setAttribute('capture', facingMode);
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+    const cleanup = () => input.remove();
+    input.onchange = (event) => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        setCameraError('No photo was selected.');
+        cleanup();
+        return;
+      }
+      update(name, `Scanned: ${label}`);
+      const reader = new FileReader();
+      reader.onload = () => {
+        update(`${name}Preview`, String(reader.result || ''));
+        setCameraError('');
+        cleanup();
+      };
+      reader.readAsDataURL(file);
+    };
+    input.oncancel = cleanup;
+    input.click();
+  };
+
   const openDocumentCamera = async (name, label, facingMode = 'environment') => {
     setCameraError('');
     if (!navigator?.mediaDevices?.getUserMedia) {
-      setCameraError('Camera is not available in this browser. Use Upload instead.');
+      openCaptureFallback(name, label, facingMode);
       return;
     }
     try {
       closeCamera();
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facingMode } } });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
       setCameraTarget({ name, label, stream });
       setTimeout(() => {
-        if (videoRef.current) videoRef.current.srcObject = stream;
+        if (!videoRef.current) return;
+        videoRef.current.srcObject = stream;
+        videoRef.current.play?.().catch(() => {
+          setCameraError('Tap the camera preview or allow camera playback, then try Snap Photo.');
+        });
       }, 0);
     } catch {
-      setCameraError('Camera permission was blocked or no camera was found.');
+      setCameraError('Live camera was blocked. Opening device camera capture instead.');
+      openCaptureFallback(name, label, facingMode);
     }
   };
 
   const snapDocumentPhoto = () => {
     const video = videoRef.current;
     if (!video || !cameraTarget) return;
+    if (!video.videoWidth || !video.videoHeight) {
+      setCameraError('Camera preview is not ready yet. Wait a second, then tap Snap Photo again.');
+      return;
+    }
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 720;
-    canvas.height = video.videoHeight || 540;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
     canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height);
     update(cameraTarget.name, `Scanned: ${cameraTarget.label}`);
     update(`${cameraTarget.name}Preview`, canvas.toDataURL('image/jpeg', 0.86));
     closeCamera();
   };
 
-  const UploadField = ({ name, label, hint }) => (
+  const ScanField = ({ name, label, hint }) => (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <View style={styles.uploadBox}>
-        <Text style={styles.uploadTitle}>{form[name] || `Upload ${label}`}</Text>
-        <Text style={styles.uploadHint}>{hint || 'Choose image or PDF from this device'}</Text>
+        <Text style={styles.uploadTitle}>{form[name] || `Scan ${label}`}</Text>
+        <Text style={styles.uploadHint}>{hint || 'Open camera and capture this document'}</Text>
         <View style={styles.uploadActions}>
-          <TouchableOpacity style={styles.uploadActionButton} onPress={() => pickDocument(name, label, 'upload')}>
-            <Text style={styles.uploadActionText}>Upload</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.uploadActionButtonAlt} onPress={() => openDocumentCamera(name, label, /face|passport/i.test(label) ? 'user' : 'environment')}>
-            <Text style={styles.uploadActionTextAlt}>Scan / Camera</Text>
+          <TouchableOpacity style={styles.uploadActionButton} onPress={() => openDocumentCamera(name, label, /face|passport/i.test(label) ? 'user' : 'environment')}>
+            <Text style={styles.uploadActionText}>📷 Camera Scan</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -199,17 +228,6 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
       {!!errors[name] && <Text style={styles.error}>{errors[name]}</Text>}
     </View>
   );
-
-  const runDemoScan = () => {
-    const extractedId = form.nationalId || '';
-    const extractedName = form.fullName || '';
-    const scanText = [
-      extractedName ? `Name: ${extractedName}` : 'Name: waiting for rider name',
-      extractedId ? `National ID: ${extractedId}` : 'National ID: waiting for ID number',
-      'Scan status: OCR-ready demo capture',
-    ].join('\n');
-    update('idScanText', scanText);
-  };
 
   const Select = ({ name, label, options }) => (
     <View style={styles.field}>
@@ -245,23 +263,20 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
             {!!errors.duplicate && <Text style={styles.error}>{errors.duplicate}</Text>}
           </View>
         )}
-        <Field name="fullName" label="Full name" />
-        <Field name="nationalId" label="National ID number" type="number-pad" />
-        <Field name="phone" label="Phone number" type="phone-pad" />
-        <Field name="riderCardId" label="Rider card ID (if known)" />
-        <Field name="dob" label="Date of birth" />
+        {renderField('fullName', 'Full name')}
+        {renderField('nationalId', 'National ID number', 'number-pad')}
+        {renderField('phone', 'Phone number', 'phone-pad')}
         <Select name="gender" label="Gender" options={['Female', 'Male', 'Other']} />
-        <Field name="location" label="Location" />
-        <Field name="occupation" label="Occupation" />
+        {renderField('location', 'Location')}
       </>
     );
     if (step === 1) return (
       <>
-        <Text style={styles.subtle}>Capture the rider face photo and ID card. Agents can upload an existing image/PDF or use Scan / Camera on supported devices.</Text>
-        <UploadField name="passport" label="Passport / rider face photo" hint="Upload or scan the rider face photo" />
-        <UploadField name="idFront" label="National ID front" hint="Upload or scan the front of the ID card" />
-        <UploadField name="idBack" label="National ID back" hint="Upload or scan the back of the ID card" />
-        <UploadField name="idScan" label="ID card scan for OCR" hint="Scan the ID card image for OCR-ready checking" />
+        <Text style={styles.subtle}>Capture the rider face photo and ID card with the device camera.</Text>
+        <ScanField name="passport" label="Passport / rider face photo" hint="Open camera for the rider face photo" />
+        <ScanField name="idFront" label="National ID front" hint="Open camera for the front of the ID card" />
+        <ScanField name="idBack" label="National ID back" hint="Open camera for the back of the ID card" />
+        <ScanField name="idScan" label="ID card scan for OCR" hint="Open camera for OCR-ready ID capture" />
         {!!cameraError && <Text style={styles.error}>{cameraError}</Text>}
         {!!cameraTarget && (
           <View style={styles.cameraPanel}>
@@ -271,14 +286,15 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
               autoPlay: true,
               playsInline: true,
               muted: true,
+              controls: false,
               style: styles.cameraPreview,
             })}
             <View style={styles.uploadActions}>
               <TouchableOpacity style={styles.uploadActionButton} onPress={snapDocumentPhoto}>
-                <Text style={styles.uploadActionText}>Snap Photo</Text>
+                <Text style={styles.uploadActionText}>📷 Snap Photo</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.uploadActionButtonAlt} onPress={closeCamera}>
-                <Text style={styles.uploadActionTextAlt}>Close Camera</Text>
+                <Text style={styles.uploadActionTextAlt}>📷 Close Camera</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -293,30 +309,66 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
             placeholder="Scanned name and National ID will appear here"
             placeholderTextColor={theme === 'dark' ? '#7f93a8' : '#8a97a8'}
           />
-          <TouchableOpacity style={styles.secondaryButton} onPress={runDemoScan}>
-            <Text style={styles.secondaryText}>Run Demo Scan</Text>
-          </TouchableOpacity>
         </View>
       </>
     );
     if (step === 2) return (
       <>
-        <Field name="kinName" label="Next-of-kin full name" />
-        <Field name="kinPhone" label="Next-of-kin phone" type="phone-pad" />
+        {renderField('kinName', 'Next-of-kin full name')}
+        {renderField('kinPhone', 'Next-of-kin phone', 'phone-pad')}
         <Select name="relationship" label="Relationship" options={['Spouse', 'Parent', 'Sibling', 'Friend', 'Guardian']} />
+        <View style={styles.otpPanel}>
+          <Text style={styles.label}>Next-of-kin consent OTP</Text>
+          <Text style={styles.subtle}>Send an OTP to the next-of-kin phone, then record whether they approve.</Text>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => {
+              setKinOtpSent(true);
+              setKinOtp('');
+              setKinConsent('');
+              setErrors((current) => ({ ...current, kinOtp: '', kinConsent: '' }));
+            }}
+          >
+            <Text style={styles.secondaryText}>{kinOtpSent ? 'Resend OTP' : 'Send OTP'}</Text>
+          </TouchableOpacity>
+          {kinOtpSent && (
+            <>
+              <Text style={styles.otpHint}>Demo OTP: 123456</Text>
+              <TextInput
+                style={styles.input}
+                value={kinOtp}
+                onChangeText={setKinOtp}
+                keyboardType="number-pad"
+                maxLength={6}
+                placeholder="Enter OTP"
+                placeholderTextColor={theme === 'dark' ? '#7f93a8' : '#8a97a8'}
+              />
+              <View style={styles.consentActions}>
+                <TouchableOpacity style={[styles.consentButton, kinConsent === 'yes' && styles.consentButtonActive]} onPress={() => setKinConsent('yes')}>
+                  <Text style={[styles.consentText, kinConsent === 'yes' && styles.consentTextActive]}>Yes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.consentButton, kinConsent === 'no' && styles.consentButtonDanger]} onPress={() => setKinConsent('no')}>
+                  <Text style={[styles.consentText, kinConsent === 'no' && styles.consentTextActive]}>No</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+          {!!errors.kinOtp && <Text style={styles.error}>{errors.kinOtp}</Text>}
+          {!!errors.kinConsent && <Text style={styles.error}>{errors.kinConsent}</Text>}
+        </View>
       </>
     );
     if (step === 3) return (
       <>
         <Select name="bikeModel" label="Bike model" options={['Boxer 150', 'TVS Star']} />
-        <Field name="chassis" label="Chassis number" />
-        <Field name="deposit" label="Deposit amount" />
+        {renderField('chassis', 'Chassis number')}
+        {renderField('deposit', 'Deposit amount')}
         <Select name="installment" label="Installment plan" options={['Daily KES 300', 'Weekly KES 2,000']} />
       </>
     );
     return (
       <View style={styles.review}>
-        {['fullName', 'nationalId', 'phone', 'riderCardId', 'passport', 'idFront', 'idBack', 'idScan', 'kinName', 'kinPhone', 'bikeModel', 'chassis', 'deposit', 'installment'].map((key) => (
+        {['fullName', 'nationalId', 'phone', 'passport', 'idFront', 'idBack', 'idScan', 'kinName', 'kinPhone', 'bikeModel', 'chassis', 'deposit', 'installment'].map((key) => (
           <Text key={key} style={styles.reviewItem}>{key.replace(/([A-Z])/g, ' $1')}: {form[key] || '-'}</Text>
         ))}
       </View>
@@ -367,6 +419,14 @@ const createStyles = (theme) => {
     cameraPreview: { width: '100%', maxHeight: 280, borderRadius: 10, backgroundColor: '#000000' },
     scanPanel: { borderWidth: 1, borderColor: dark ? '#183054' : '#e7eef4', borderRadius: 12, backgroundColor: dark ? '#030814' : '#f8fafc', padding: 12, marginTop: 4, gap: 10 },
     scanTextArea: { minHeight: 96, textAlignVertical: 'top' },
+    otpPanel: { borderWidth: 1, borderColor: dark ? '#183054' : '#e7eef4', borderRadius: 12, backgroundColor: dark ? '#030814' : '#f8fafc', padding: 12, gap: 10, marginTop: 4 },
+    otpHint: { color: '#0f5fff', fontSize: 12, fontWeight: '900', fontFamily: 'Georgia' },
+    consentActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    consentButton: { minWidth: 82, borderRadius: 9, borderWidth: 1, borderColor: dark ? '#334155' : '#dce3ea', backgroundColor: dark ? '#07101f' : '#ffffff', paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center' },
+    consentButtonActive: { backgroundColor: '#23863a', borderColor: '#23863a' },
+    consentButtonDanger: { backgroundColor: '#bd2a2a', borderColor: '#bd2a2a' },
+    consentText: { color: dark ? '#f3f6fb' : '#0b1730', fontSize: 13, fontWeight: '900', fontFamily: 'Georgia' },
+    consentTextActive: { color: '#ffffff' },
     datePickButton: { flexDirection: 'row', gap: 8, alignSelf: 'flex-start', borderWidth: 1, borderColor: dark ? '#334155' : '#dce3ea', borderRadius: 12, backgroundColor: dark ? '#030814' : '#f8fafc', padding: 8 },
     datePart: { minWidth: 76, borderRadius: 9, backgroundColor: dark ? '#07101f' : '#ffffff', borderWidth: 1, borderColor: dark ? '#183054' : '#e7eef4', paddingVertical: 8, paddingHorizontal: 10 },
     datePartLabel: { color: '#0f5fff', fontSize: 10, fontWeight: '900', fontFamily: 'Georgia', textTransform: 'uppercase', marginBottom: 3 },

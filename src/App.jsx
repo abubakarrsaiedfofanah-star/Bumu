@@ -4,9 +4,7 @@ import Auth from './features/auth/Auth';
 import Dashboard from './features/dashboard/Dashboard';
 import RegisterRider from './features/register/RegisterRider';
 import Customers from './features/customers/Customers';
-import Commissions from './features/commissions/Commissions';
 import Notifications from './features/notifications/Notifications';
-import Security from './features/security/Security';
 import Profile from './features/profile/Profile';
 import Settings from './features/settings/Settings';
 import '../bumu.css';
@@ -15,12 +13,8 @@ const routes = [
   { id: 'dashboard', screen: 'dashboard', label: 'Dashboard', detail: 'Targets, follow-ups, alerts, and urgent rider actions' },
   { id: 'register', screen: 'register', label: 'Register Rider', detail: 'Create a clean rider contract with duplicate protection' },
   { id: 'riders', screen: 'customers', label: 'Riders', detail: 'Portfolio, identity checks, documents, and evidence history' },
-  { id: 'payments', screen: 'customers', label: 'Payments', detail: 'Collect payments, check dates, overdue riders, and proof', action: 'Payments hub' },
-  { id: 'transfers', screen: 'customers', label: 'Transfers', detail: 'Review old contracts, repairs, transfer notes, and debt changes', action: 'Track contracts and repairs' },
-  { id: 'commissions', screen: 'commissions', label: 'Commissions', detail: 'Commission totals, paid records, pending records, and CSV export' },
-  { id: 'notifications', screen: 'notifications', label: 'Notifications', detail: 'Payment reminders, document updates, and unread notices' },
-  { id: 'security', screen: 'security', label: 'Security', detail: 'Privacy mask, lock session, PIN, and audit trail' },
-  { id: 'settings', screen: 'settings', label: 'Settings', detail: 'Defaults, password, theme, install app, and reset tools' },
+  { id: 'notifications', screen: 'notifications', label: 'Notifications', detail: 'Document updates, rider alerts, and unread notices' },
+  { id: 'settings', screen: 'settings', label: 'Settings', detail: 'Defaults, password, theme, and app preferences' },
   { id: 'account', screen: 'profile', label: 'Account', detail: 'Agent profile, identity, approval status, and sign out' },
 ];
 
@@ -32,8 +26,8 @@ const featureMenus = {
     { label: 'Review recent activity', detail: 'Use alerts and activity history to see what changed today.' },
   ],
   register: [
-    { label: 'Search identity first', detail: 'Enter National ID, phone, rider card, or chassis to catch duplicate contracts.' },
-    { label: 'Capture rider profile', detail: 'Record legal name, ID, phone, date of birth, gender, location, and occupation.' },
+    { label: 'Search identity first', detail: 'Enter National ID, phone, or chassis to catch duplicate contracts.' },
+    { label: 'Capture rider profile', detail: 'Record legal name, ID, phone, gender, and location.' },
     { label: 'Attach documents', detail: 'Capture passport, ID front, and ID back references for the rider file.' },
     { label: 'Assign bike and payment plan', detail: 'Add bike model, chassis, deposit, and installment plan.' },
     { label: 'Review and submit', detail: 'Check the full application, then create the rider contract.' },
@@ -44,26 +38,9 @@ const featureMenus = {
     { label: 'Verify evidence', detail: 'Record visit proof, ID scan, chassis check, promise to pay, and evidence logs.' },
     { label: 'Export portfolio', detail: 'Download rider records when reporting is needed.' },
   ],
-  payments: [
-    { label: 'Collect payment', detail: 'Open riders with balances and record proof quickly.' },
-    { label: 'Work payment calendar', detail: 'Pick a date to see expected collections, due dates, and actual payments.' },
-    { label: 'Check overdue riders', detail: 'See riders with debt due or blocked payment status.' },
-    { label: 'Record payment proof', detail: 'Save M-Pesa code, payer phone, amount, and evidence.' },
-  ],
-  transfers: [
-    { label: 'Track contracts and repairs', detail: 'Review old contracts, active debt, repair requests, and projected balance.' },
-    { label: 'Previous agent check', detail: 'Confirm old agent, old contract, and active balance before transfer.' },
-    { label: 'Repair debt review', detail: 'Review repair requests that may increase rider debt.' },
-  ],
-  commissions: [
-    { label: 'Read totals', detail: 'Confirm finance ledger totals and rider commission estimates.' },
-    { label: 'Review ledger', detail: 'Check rider paid amount, progress, estimate rate, and finance status.' },
-    { label: 'Filter by status mentally', detail: 'Use paid, pending, and cancelled labels to spot what needs finance review.' },
-    { label: 'Export report', detail: 'Download commission estimate or finance ledger CSV for reconciliation.' },
-  ],
   notifications: [
-    { label: 'Open unread first', detail: 'Start from new alerts so payment and document issues are not missed.' },
-    { label: 'Check payment reminders', detail: 'Use reminders to decide who needs a call, visit, or promise to pay.' },
+    { label: 'Open unread first', detail: 'Start from new alerts so rider and document issues are not missed.' },
+    { label: 'Check rider reminders', detail: 'Use reminders to decide who needs a call, visit, or follow-up.' },
     { label: 'Review document updates', detail: 'Confirm rider files that changed or need another check.' },
     { label: 'Clear handled alerts', detail: 'Mark all read after the work is checked.' },
   ],
@@ -72,17 +49,9 @@ const featureMenus = {
     { label: 'Update profile', detail: 'Edit agent information without changing rider contracts.' },
     { label: 'Sign out safely', detail: 'Leave the portal when work is done.' },
   ],
-  security: [
-    { label: 'Mask private data', detail: 'Turn on privacy mode before showing the screen in public.' },
-    { label: 'Lock session', detail: 'Require secure PIN before anyone can continue using the portal.' },
-    { label: 'Change PIN', detail: 'Update the agent unlock code when needed.' },
-    { label: 'Export audit trail', detail: 'Download security activity for supervision or review.' },
-  ],
   settings: [
     { label: 'Set agent defaults', detail: 'Control default region, bike model, installment plan, and notification behavior.' },
     { label: 'Change password', detail: 'Replace the current login password.' },
-    { label: 'Install portal', detail: 'Add the portal to this device where the browser supports it.' },
-    { label: 'Reset workspace', detail: 'Return to dashboard or restore demo data when testing.' },
   ],
 };
 
@@ -171,16 +140,16 @@ const initialCommissions = [
 ];
 
 const initialNotifications = [
-  { id: 1, title: 'Payment received', body: 'KES 1,200 from John Doe has been confirmed.', unread: true, category: 'payment' },
+  { id: 1, title: 'Rider update received', body: 'John Doe has a new account update to review.', unread: true, category: 'rider' },
   { id: 2, title: 'Document update needed', body: 'Alice Njeri uploaded a new ID photo for review.', unread: true, category: 'document' },
-  { id: 3, title: 'Commission payout', body: 'Your commission payment for April is ready.', unread: false, category: 'commission' },
-  { id: 4, title: 'New rider pending', body: 'Jane Mwangi requires verification for the first payment.', unread: false, category: 'task' },
+  { id: 3, title: 'Agent notice', body: 'Your agent account has a new office notice.', unread: false, category: 'notice' },
+  { id: 4, title: 'New rider pending', body: 'Jane Mwangi requires verification for the first review.', unread: false, category: 'task' },
 ];
 
 const initialTasks = [
-  { id: 1, customerId: 2, customerName: 'Jane Mwangi', title: 'Verify payment status', due: 'Today', status: 'Open', note: 'Confirm weekly installment and document upload.' },
+  { id: 1, customerId: 2, customerName: 'Jane Mwangi', title: 'Verify rider status', due: 'Today', status: 'Open', note: 'Confirm rider details and document scan.' },
   { id: 2, customerId: 4, customerName: 'Alice Njeri', title: 'Review verification documents', due: 'Tomorrow', status: 'Open', note: 'Check latest ID photo and confirm next steps.' },
-  { id: 3, customerId: 1, customerName: 'John Doe', title: 'Confirm repayment plan', due: 'Next 2 days', status: 'Open', note: 'Touch base on progress and next expected payment.' },
+  { id: 3, customerId: 1, customerName: 'John Doe', title: 'Confirm rider follow-up', due: 'Next 2 days', status: 'Open', note: 'Touch base on rider progress and next follow-up.' },
 ];
 
 const defaultAgent = {
@@ -212,7 +181,8 @@ export default function App() {
   const [notifications, setNotifications] = useState(() => loadState('notifications', initialNotifications));
   const [tasks, setTasks] = useState(() => loadState('tasks', initialTasks));
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
-  const [installStatus, setInstallStatus] = useState('Install button appears when your browser allows app installation.');
+  const [installStatus, setInstallStatus] = useState('');
+  const [appInstalled, setAppInstalled] = useState(() => loadState('app-installed', false));
   const [security, setSecurity] = useState(() => loadState('security', {
     locked: false,
     pin: '1234',
@@ -254,6 +224,8 @@ export default function App() {
     };
     const onAppInstalled = () => {
       setDeferredInstallPrompt(null);
+      setAppInstalled(true);
+      saveState('app-installed', true);
       setInstallStatus('BUMU Agent Portal is installed on this device.');
     };
     window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
@@ -447,6 +419,15 @@ export default function App() {
     return { success: true, pending: true, message: 'Agent account created. Status: Pending admin approval.' };
   };
 
+  const handleResetLoginPassword = (email, nextPassword) => {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const agentEmail = String(agent?.email || defaultAgent.email).trim().toLowerCase();
+    if (normalizedEmail !== agentEmail) return false;
+    setAgent((current) => ({ ...(current || defaultAgent), password: nextPassword }));
+    audit('Password reset by admin OTP', `Password reset for ${normalizedEmail}`);
+    return true;
+  };
+
   const handleLogout = () => {
     setLoggedIn(false);
     setRoute('dashboard');
@@ -634,7 +615,6 @@ export default function App() {
         const reasons = [];
         if (form.nationalId && cleanValue(customer.nationalId) === cleanValue(form.nationalId)) reasons.push('National ID');
         if (form.phone && normalizePhone(customer.phone) === normalizedPhone) reasons.push('Phone number');
-        if (form.riderCardId && cleanValue(customer.cardId || customer.customerCardId) === cleanValue(form.riderCardId)) reasons.push('Rider card ID');
         if (form.chassis && cleanValue(customer.chassis) === cleanValue(form.chassis)) reasons.push('Chassis number');
         return reasons.length ? { customer, reasons } : null;
       })
@@ -707,7 +687,6 @@ export default function App() {
       nationalId: form.nationalId,
       region: form.location,
       location: form.location,
-      occupation: form.occupation,
       status: 'Pending',
       cardId,
       riderAssignmentId,
@@ -806,7 +785,13 @@ export default function App() {
     deferredInstallPrompt.prompt();
     const result = await deferredInstallPrompt.userChoice;
     setDeferredInstallPrompt(null);
-    setInstallStatus(result.outcome === 'accepted' ? 'Installation started.' : 'Installation was dismissed.');
+    if (result.outcome === 'accepted') {
+      setAppInstalled(true);
+      saveState('app-installed', true);
+      setInstallStatus('Installation started.');
+      return;
+    }
+    setInstallStatus('Installation was dismissed.');
   };
 
   const lockSession = () => {
@@ -917,11 +902,9 @@ export default function App() {
   };
   const openHomeAction = (label) => {
     const map = {
-      'Collect Payment': 'payments',
       'Register Rider': 'register',
       'Find Rider': 'riders',
       'Verify Rider': 'riders',
-      'Transfer Rider': 'transfers',
       'Record Visit': 'riders',
     };
     setRoute(map[label] || 'dashboard');
@@ -943,7 +926,6 @@ export default function App() {
   const activeInsight = useMemo(() => {
     const openTasks = tasks.filter((item) => item.status !== 'Done').length;
     const unreadAlerts = notifications.filter((item) => item.unread).length;
-    const pendingCommissions = commissions.filter((item) => item.status === 'Pending').length;
     const flaggedRiders = customers.filter((item) => item.flagged || item.risk >= 60 || item.overdue).length;
     const insights = {
       dashboard: {
@@ -961,30 +943,10 @@ export default function App() {
         detail: `${flaggedRiders} rider accounts need closer attention before the next review.`,
         metric: `${customers.length} riders`,
       },
-      payments: {
-        kicker: 'Payment desk',
-        detail: `Collect payments, check payment dates, and update rider balances without leaving the rider account.`,
-        metric: `${customers.length} riders`,
-      },
-      transfers: {
-        kicker: 'Transfer control',
-        detail: `Review contracts, repair debt, previous agents, and transfer notes before any account moves.`,
-        metric: `${customers.length} records`,
-      },
-      commissions: {
-        kicker: 'Earnings desk',
-        detail: `${pendingCommissions} commission records are still pending reconciliation.`,
-        metric: `${commissions.length} records`,
-      },
       notifications: {
         kicker: 'Alert center',
-        detail: `${unreadAlerts} unread alerts are available for payments, documents, and tasks.`,
+        detail: `${unreadAlerts} unread alerts are available for documents, riders, and tasks.`,
         metric: `${unreadAlerts} unread`,
-      },
-      security: {
-        kicker: 'Security desk',
-        detail: `${security.privacyMode ? 'Privacy masking is on' : 'Privacy masking is off'} with ${(security.auditLog || []).length} audit events.`,
-        metric: security.locked ? 'Locked' : 'Open',
       },
       settings: {
         kicker: 'Portal settings',
@@ -998,7 +960,7 @@ export default function App() {
       },
     };
     return insights[route] || insights.dashboard;
-  }, [agent, commissions, customers, notifications, route, security, settings, tasks, theme]);
+  }, [agent, customers, notifications, route, settings, tasks, theme]);
   const portalStatus = useMemo(() => {
     const openTasks = tasks.filter((item) => item.status !== 'Done').length;
     const unreadAlerts = notifications.filter((item) => item.unread).length;
@@ -1013,7 +975,7 @@ export default function App() {
   const visibleNavItems = navMenuOpen ? routes : [activeRoute];
 
   if (!loggedIn) {
-    return <Auth agent={agent} onLogin={handleLogin} onRegister={handleRegisterAgent} theme={theme} />;
+    return <Auth agent={agent} onLogin={handleLogin} onRegister={handleRegisterAgent} onResetPassword={handleResetLoginPassword} theme={theme} />;
   }
 
   if (security.locked) {
@@ -1061,7 +1023,7 @@ export default function App() {
             style={styles.commandInput}
             value={commandQuery}
             onChangeText={setCommandQuery}
-            placeholder={isCompact ? 'Search rider, ID, payment...' : 'Command search: rider, ID, payment, overdue, change password...'}
+            placeholder={isCompact ? 'Search rider, ID, phone...' : 'Command search: rider, ID, phone, overdue, change password...'}
             placeholderTextColor={theme === 'dark' ? '#7f93a8' : '#8a97a8'}
           />
           {!!commandResults.length && (
@@ -1133,18 +1095,24 @@ export default function App() {
             </View>
 
             <ScrollView contentContainerStyle={styles.pageContent} showsVerticalScrollIndicator={false}>
-              {activeRoute.screen === 'dashboard' && <Dashboard theme={theme} simpleMode={settings.simpleMode} selectedAction={activeRoute.action || ''} customers={customers} commissions={commissions} notifications={notifications} tasks={tasks} onCompleteTask={completeFollowUpTask} onHomeAction={openHomeAction} />}
+              {activeRoute.screen === 'dashboard' && <Dashboard theme={theme} simpleMode={settings.simpleMode} selectedAction={activeRoute.action || ''} customers={customers} notifications={notifications} tasks={tasks} onCompleteTask={completeFollowUpTask} onHomeAction={openHomeAction} />}
               {activeRoute.screen === 'register' && <RegisterRider theme={theme} selectedAction={activeRoute.action || ''} settings={settings} customers={customers} agent={agent} onSubmitRider={submitRider} />}
               {activeRoute.screen === 'customers' && <Customers theme={theme} simpleMode={settings.simpleMode} commandRiderId={commandRiderId} selectedAction={activeRoute.action || ''} customers={customers} agent={agent} privacyMode={security.privacyMode} onExportCsv={downloadCsv} onAddPayment={addCustomerPayment} onCreateTask={addFollowUpTask} onSendMessage={sendRiderMessage} onAgentRecord={addCustomerAgentRecord} onChecklistChange={updateCustomerChecklist} />}
-              {activeRoute.screen === 'commissions' && <Commissions theme={theme} selectedAction={activeRoute.action || ''} commissions={commissions} customers={customers} onExportCsv={downloadCsv} />}
               {activeRoute.screen === 'notifications' && <Notifications theme={theme} selectedAction={activeRoute.action || ''} notifications={notifications} onMarkAllRead={markNotificationsRead} onOpenNotification={toggleNotificationDetails} />}
-              {activeRoute.screen === 'security' && <Security theme={theme} selectedAction={activeRoute.action || ''} security={security} customers={customers} onTogglePrivacy={(value) => { setSecurity((current) => ({ ...current, privacyMode: value })); audit('Privacy mode', value ? 'Enabled rider masking' : 'Disabled rider masking'); }} onLock={lockSession} onChangePin={(pin) => { setSecurity((current) => ({ ...current, pin })); audit('PIN changed', 'Agent changed secure session PIN'); }} onExportAudit={exportAuditCsv} />}
               {activeRoute.screen === 'profile' && <Profile theme={theme} selectedAction={activeRoute.action || ''} agent={agent} onUpdateAgent={handleUpdateAgent} onLogout={handleLogout} />}
-              {activeRoute.screen === 'settings' && <Settings theme={theme} selectedAction={activeRoute.action || ''} settings={settings} installStatus={installStatus} onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} onToggleSetting={updateSetting} onUpdateSetting={updateSetting} onInstallApp={installApp} onResetSession={() => { setRoute('dashboard'); audit('Session reset', 'Returned portal to dashboard'); }} onResetDemoData={resetDemoData} onChangePassword={handleChangePassword} passwordMessage={passwordMessage} />}
+              {activeRoute.screen === 'settings' && <Settings theme={theme} selectedAction={activeRoute.action || ''} settings={settings} onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} onToggleSetting={updateSetting} onUpdateSetting={updateSetting} onChangePassword={handleChangePassword} passwordMessage={passwordMessage} />}
             </ScrollView>
           </View>
         </View>
       </View>
+      {!appInstalled && (
+        <View style={styles.installFabWrap}>
+          <TouchableOpacity style={styles.installFab} onPress={installApp}>
+            <Text style={styles.installFabText}>Install Bumu</Text>
+          </TouchableOpacity>
+          {!!installStatus && <Text style={styles.installFabStatus}>{installStatus}</Text>}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1788,6 +1756,48 @@ const createStyles = (theme, isDesktop, isCompact) => {
     },
     accountStack: {
       gap: 18,
+    },
+    installFabWrap: {
+      position: 'fixed',
+      right: isCompact ? 12 : 18,
+      bottom: isCompact ? 12 : 18,
+      zIndex: 40,
+      maxWidth: isCompact ? 240 : 300,
+      gap: 6,
+      alignItems: 'flex-end',
+    },
+    installFab: {
+      backgroundColor: '#0f5fff',
+      borderRadius: 999,
+      paddingVertical: 12,
+      paddingHorizontal: 18,
+      shadowColor: '#003040',
+      shadowOpacity: 0.18,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+      alignSelf: 'flex-end',
+    },
+    installFabText: {
+      color: '#ffffff',
+      fontSize: 13,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+    },
+    installFabStatus: {
+      color: '#0b1730',
+      backgroundColor: '#ffffff',
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: '#d8e3f7',
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+      fontSize: 11,
+      fontWeight: '800',
+      fontFamily: 'Georgia',
+      shadowColor: '#003040',
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
     },
     textDark: {
       color: '#0b1730',

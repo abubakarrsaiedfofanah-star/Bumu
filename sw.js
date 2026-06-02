@@ -1,9 +1,15 @@
-const CACHE_NAME = 'bumu-agent-portal-v1';
-const ASSETS = ['/', '/index.html', '/manifest.webmanifest'];
+const CACHE_NAME = 'bumu-agent-portal-v2';
+const APP_SHELL = ['/Bumu/', '/Bumu/index.html', '/manifest.webmanifest'];
+
+const isSameOrigin = (request) => new URL(request.url).origin === self.location.origin;
+const isFreshAsset = (request) => {
+  const url = new URL(request.url);
+  return /\.(?:js|css|png|jpg|jpeg|webp|svg|ico|webmanifest)$/i.test(url.pathname);
+};
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL).catch(() => undefined))
   );
   self.skipWaiting();
 });
@@ -11,33 +17,30 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+      Promise.all(keys.map((key) => caches.delete(key)))
     )
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const { request } = event;
+  if (request.method !== 'GET' || !isSameOrigin(request)) return;
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
-      return fetch(event.request)
-        .then((response) => {
+    fetch(request)
+      .then((response) => {
+        if (response.ok && (request.mode === 'navigate' || isFreshAsset(request))) {
           const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            if (event.request.url.startsWith(self.location.origin)) {
-              cache.put(event.request, responseClone);
-            }
-          });
-          return response;
-        })
-        .catch(() => {
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
-          }
-        });
-    })
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+        }
+        return response;
+      })
+      .catch(() => {
+        if (request.mode === 'navigate') {
+          return caches.match('/Bumu/index.html').then((cached) => cached || caches.match('/index.html'));
+        }
+        return caches.match(request);
+      })
   );
 });

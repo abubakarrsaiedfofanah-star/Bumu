@@ -4,9 +4,8 @@ import '../../../features/dashboard/dashboard.css';
 
 const formatKes = (amount) => `KES ${Number(amount || 0).toLocaleString('en-KE')}`;
 
-export default function Dashboard({ customers = [], commissions = [], notifications = [], tasks = [] }) {
+export default function Dashboard({ customers = [], notifications = [], tasks = [] }) {
   const styles = useMemo(() => createStyles(), []);
-  const bikePrice = (model) => ({ 'Boxer 150': 180000, 'TVS Star': 150000, 'Cruiser 200': 220000 }[model] || 160000);
 
   const riderSummary = {
     total: customers.length,
@@ -14,36 +13,6 @@ export default function Dashboard({ customers = [], commissions = [], notificati
     pending: customers.filter((item) => item.status === 'Pending' || item.status === 'Info Required').length,
     overdue: customers.filter((item) => item.overdue).length,
   };
-
-  const paymentSummary = customers.reduce((acc, customer) => {
-    const total = customer.totalPrice || bikePrice(customer.bike);
-    const paid = Number(customer.paid || 0) || Math.round((total * Number(customer.progress || 0)) / 100);
-    const remaining = Math.max(0, customer.remaining ?? total - paid);
-    return {
-      expected: acc.expected + Math.round(total * 0.12),
-      paid: acc.paid + paid,
-      remaining: acc.remaining + remaining,
-      total: acc.total + total,
-    };
-  }, { expected: 0, paid: 0, remaining: 0, total: 0 });
-
-  const progress = paymentSummary.total ? Math.round((paymentSummary.paid / paymentSummary.total) * 100) : 0;
-  const commissionSummary = {
-    total: commissions.reduce((sum, item) => sum + Number(item.amount || 0), 0),
-    pending: commissions.filter((item) => item.status === 'Pending').reduce((sum, item) => sum + Number(item.amount || 0), 0),
-    paid: commissions.filter((item) => item.status === 'Paid').reduce((sum, item) => sum + Number(item.amount || 0), 0),
-    records: commissions.length,
-  };
-
-  const commissionPerRider = Object.values(commissions.reduce((acc, item) => {
-    const rider = item.rider || 'Unknown rider';
-    if (!acc[rider]) acc[rider] = { rider, count: 0, total: 0, pending: 0, paid: 0 };
-    acc[rider].count += 1;
-    acc[rider].total += Number(item.amount || 0);
-    if (item.status === 'Pending') acc[rider].pending += 1;
-    if (item.status === 'Paid') acc[rider].paid += 1;
-    return acc;
-  }, {})).slice(0, 6);
 
   const alerts = [
     ...customers.filter((item) => item.overdue).slice(0, 2).map((item) => `${item.name}: overdue balance ${formatKes(item.remaining)}`),
@@ -57,27 +26,6 @@ export default function Dashboard({ customers = [], commissions = [], notificati
     { label: 'Active', value: riderSummary.active, letter: 'A', color: 'green' },
     { label: 'Pending', value: riderSummary.pending, letter: 'P', color: 'amber' },
     { label: 'Overdue', value: riderSummary.overdue, letter: 'O', color: 'red' },
-  ];
-
-  const summaryCards = [
-    {
-      title: 'Payments',
-      rows: [
-        ['Expected collection', formatKes(paymentSummary.expected)],
-        ['Paid so far', formatKes(paymentSummary.paid)],
-        ['Remaining balance', formatKes(paymentSummary.remaining)],
-        ['Collection progress', `${progress}%`],
-      ],
-    },
-    {
-      title: 'Commissions',
-      rows: [
-        ['Total commission', formatKes(commissionSummary.total)],
-        ['Paid commission', formatKes(commissionSummary.paid)],
-        ['Pending commission', formatKes(commissionSummary.pending)],
-        ['Commission records', commissionSummary.records],
-      ],
-    },
   ];
 
   return (
@@ -99,35 +47,6 @@ export default function Dashboard({ customers = [], commissions = [], notificati
         ))}
       </View>
 
-      <View style={styles.cardGrid}>
-        {summaryCards.map((card) => (
-          <View key={card.title} style={styles.premiumCard}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{card.title}</Text>
-            </View>
-            {card.rows.map(([label, value]) => (
-              <View key={label} style={styles.row}>
-                <Text style={styles.label}>{label}</Text>
-                <Text style={styles.value}>{value}</Text>
-              </View>
-            ))}
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.premiumCard}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Commission Per Rider</Text>
-          <Text style={styles.badge}>{commissionPerRider.length}</Text>
-        </View>
-        {commissionPerRider.length ? commissionPerRider.map((item) => (
-          <View key={item.rider} style={styles.row}>
-            <Text style={styles.label}>{item.rider} ({item.count})</Text>
-            <Text style={styles.value}>{formatKes(item.total)}</Text>
-          </View>
-        )) : <Text style={styles.empty}>No commission records yet.</Text>}
-      </View>
-
       <View style={styles.premiumCard}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>Critical Alerts</Text>
@@ -137,6 +56,7 @@ export default function Dashboard({ customers = [], commissions = [], notificati
           <Text key={item} style={styles.alert}>{item}</Text>
         )) : <Text style={styles.empty}>No critical alerts right now.</Text>}
       </View>
+
     </ScrollView>
   );
 }
