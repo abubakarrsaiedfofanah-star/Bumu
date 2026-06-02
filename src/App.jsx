@@ -671,6 +671,7 @@ export default function App() {
     const returningRider = !!duplicate && duplicateBalance <= 0;
     const riderPersonId = duplicate?.riderPersonId || generateRiderPersonId(form);
     const contractId = generateContractId(agent.agentCode, `${riderPersonId}:${nextId}`, customers);
+    const screeningQueueId = `SCR-${agent.agentCode}-${checksum(`${contractId}:${createdAt}`)}`;
     const previousContracts = duplicate
       ? customers.filter((customer) => (
         customer.riderPersonId === duplicate.riderPersonId
@@ -698,6 +699,19 @@ export default function App() {
       linkedPreviousAgentCode: duplicateAgent !== 'another agent' && returningRider ? duplicateAgent : '',
       linkedRiderId: duplicate?.cardId || '',
       returningRider,
+      screeningQueueId,
+      screeningStatus: 'Queued',
+      screeningSubmittedAt: createdAt,
+      backOfficeQueue: {
+        id: screeningQueueId,
+        queue: 'screening',
+        status: 'Queued',
+        submittedAt: createdAt,
+        submittedByAgentCode: agent.agentCode,
+      },
+      customerOtpVerified: true,
+      nextOfKinOtpVerified: true,
+      nextOfKinConsent: 'yes',
       contractStatus: remainingAmount > 0 ? 'Active' : 'Cleared',
       contractSequence: returningRider ? previousContracts.length + 1 : 1,
       assignmentNote: returningRider ? `Returning rider. Previous account under ${duplicateAgent} is cleared. New contract created for ${agent.agentCode}; old card ${duplicate.cardId} remains linked.` : '',
@@ -761,7 +775,15 @@ export default function App() {
         agentCode: agent.agentCode,
         time: new Date().toLocaleString(),
         date: createdAt.slice(0, 10),
-      }] : [],
+      }] : [{
+        id: Date.now() + 2,
+        type: 'screening-queue',
+        title: 'Back-office screening queued',
+        detail: `Application ${screeningQueueId} submitted by ${agent.agentCode}.`,
+        agentCode: agent.agentCode,
+        time: new Date().toLocaleString(),
+        date: createdAt.slice(0, 10),
+      }],
     };
     setCustomers((current) => [newCustomer, ...current]);
     setCommissions((current) => [
@@ -769,7 +791,7 @@ export default function App() {
       ...current,
     ]);
     setNotifications((current) => [
-      { id: Date.now(), title: returningRider ? 'Returning rider new contract' : 'New rider pending', body: returningRider ? `${form.fullName} had a cleared previous account under ${duplicateAgent}. New contract ${riderAssignmentId} created.` : `${form.fullName} submitted to screening.`, unread: true, category: returningRider ? 'returning-rider' : 'task' },
+      { id: Date.now(), title: returningRider ? 'Returning rider new contract' : 'New rider pending', body: returningRider ? `${form.fullName} had a cleared previous account under ${duplicateAgent}. New contract ${riderAssignmentId} created and queued for screening.` : `${form.fullName} submitted to back-office screening queue ${screeningQueueId}.`, unread: true, category: returningRider ? 'returning-rider' : 'task' },
       ...current,
     ]);
     audit(returningRider ? 'Returning rider contract created' : 'Application submitted', returningRider ? `${form.fullName} linked from cleared account ${duplicate.cardId} under ${duplicateAgent} to new contract ${cardId}` : `${form.fullName} moved to screening`);

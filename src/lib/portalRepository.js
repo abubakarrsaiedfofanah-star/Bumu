@@ -93,6 +93,52 @@ export const createNextOfKinConsent = async ({
   return data;
 };
 
+export const createCustomerPhoneVerification = async ({
+  contractId = null,
+  agentId,
+  riderPhone,
+  otpReference,
+  otpVerified,
+}) => {
+  const client = requireSupabase();
+  const { data, error } = await client
+    .from('customer_phone_verifications')
+    .insert({
+      contract_id: contractId,
+      agent_id: agentId,
+      rider_phone: riderPhone,
+      otp_reference: otpReference,
+      otp_verified: otpVerified,
+      verified_at: otpVerified ? new Date().toISOString() : null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
+
+export const createBackOfficeScreeningQueueItem = async ({
+  queueReference,
+  contractId,
+  agentId,
+  notes = '',
+}) => {
+  const client = requireSupabase();
+  const { data, error } = await client
+    .from('back_office_screening_queue')
+    .insert({
+      queue_reference: queueReference,
+      contract_id: contractId,
+      submitted_by_agent_id: agentId,
+      status: 'queued',
+      notes,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
+
 export const uploadPortalPhoto = async ({ bucket = 'rider-documents', path, file }) => {
   const client = requireSupabase();
   const { data, error } = await client.storage

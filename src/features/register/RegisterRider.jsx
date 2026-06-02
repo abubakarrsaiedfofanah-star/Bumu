@@ -48,6 +48,8 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
   const [lastSavedAt, setLastSavedAt] = useState('');
   const [cameraTarget, setCameraTarget] = useState(null);
   const [cameraError, setCameraError] = useState('');
+  const [customerOtp, setCustomerOtp] = useState('');
+  const [customerOtpSent, setCustomerOtpSent] = useState(false);
   const [kinOtp, setKinOtp] = useState('');
   const [kinOtpSent, setKinOtpSent] = useState(false);
   const [kinConsent, setKinConsent] = useState('');
@@ -86,6 +88,8 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
       ['fullName', 'nationalId', 'phone', 'gender', 'location'].forEach((key) => required(key, key.replace(/([A-Z])/g, ' $1')));
       if (form.phone && !/^(?:\+254|254|0)(?:7|1)\d{8}$/.test(String(form.phone).replace(/[\s-]/g, ''))) next.phone = 'Use +2547..., +2541..., 07..., or 01...';
       if (form.nationalId && !/^\d{7,8}$/.test(form.nationalId.trim())) next.nationalId = 'National ID should be 7 to 8 digits';
+      if (!customerOtpSent) next.customerOtp = 'Send OTP to rider phone first';
+      if (customerOtpSent && customerOtp !== '123456') next.customerOtp = 'Enter the OTP sent to rider phone';
     }
     if (targetStep === 1) ['passport', 'idFront', 'idBack', 'idScan'].forEach((key) => required(key, key.replace(/([A-Z])/g, ' $1')));
     if (targetStep === 2) ['kinName', 'kinPhone', 'relationship'].forEach((key) => required(key, key.replace(/([A-Z])/g, ' $1')));
@@ -116,6 +120,8 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
       return;
     }
     setForm(emptyForm(settings));
+    setCustomerOtp('');
+    setCustomerOtpSent(false);
     setKinOtp('');
     setKinOtpSent(false);
     setKinConsent('');
@@ -266,6 +272,35 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
         {renderField('fullName', 'Full name')}
         {renderField('nationalId', 'National ID number', 'number-pad')}
         {renderField('phone', 'Phone number', 'phone-pad')}
+        <View style={styles.otpPanel}>
+          <Text style={styles.label}>Rider phone ownership OTP</Text>
+          <Text style={styles.subtle}>Send an OTP to the rider phone number to confirm the customer owns this number before continuing.</Text>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => {
+              setCustomerOtpSent(true);
+              setCustomerOtp('');
+              setErrors((current) => ({ ...current, customerOtp: '' }));
+            }}
+          >
+            <Text style={styles.secondaryText}>{customerOtpSent ? 'Resend OTP' : 'Send OTP'}</Text>
+          </TouchableOpacity>
+          {customerOtpSent && (
+            <>
+              <Text style={styles.otpHint}>Demo OTP: 123456</Text>
+              <TextInput
+                style={styles.input}
+                value={customerOtp}
+                onChangeText={setCustomerOtp}
+                keyboardType="number-pad"
+                maxLength={6}
+                placeholder="Enter rider OTP"
+                placeholderTextColor={theme === 'dark' ? '#7f93a8' : '#8a97a8'}
+              />
+            </>
+          )}
+          {!!errors.customerOtp && <Text style={styles.error}>{errors.customerOtp}</Text>}
+        </View>
         <Select name="gender" label="Gender" options={['Female', 'Male', 'Other']} />
         {renderField('location', 'Location')}
       </>
@@ -368,7 +403,9 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
     );
     return (
       <View style={styles.review}>
-        {['fullName', 'nationalId', 'phone', 'passport', 'idFront', 'idBack', 'idScan', 'kinName', 'kinPhone', 'bikeModel', 'chassis', 'deposit', 'installment'].map((key) => (
+        <Text style={styles.reviewItem}>Rider phone OTP: Verified</Text>
+        <Text style={styles.reviewItem}>Next-of-kin OTP: Verified</Text>
+        {['fullName', 'nationalId', 'phone', 'passport', 'idFront', 'idBack', 'idScan', 'kinName', 'kinPhone', 'relationship', 'bikeModel', 'chassis', 'deposit', 'installment'].map((key) => (
           <Text key={key} style={styles.reviewItem}>{key.replace(/([A-Z])/g, ' $1')}: {form[key] || '-'}</Text>
         ))}
       </View>
