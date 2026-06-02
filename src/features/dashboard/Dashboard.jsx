@@ -4,7 +4,7 @@ import '../../../features/dashboard/dashboard.css';
 
 const formatKes = (amount) => `KES ${Number(amount || 0).toLocaleString('en-KE')}`;
 
-export default function Dashboard({ customers = [], notifications = [], tasks = [] }) {
+export default function Dashboard({ customers = [], notifications = [], tasks = [], commissions = [] }) {
   const styles = useMemo(() => createStyles(), []);
 
   const riderSummary = {
@@ -26,6 +26,7 @@ export default function Dashboard({ customers = [], notifications = [], tasks = 
     { label: 'Active', value: riderSummary.active, letter: 'A', color: 'green' },
     { label: 'Pending', value: riderSummary.pending, letter: 'P', color: 'amber' },
     { label: 'Overdue', value: riderSummary.overdue, letter: 'O', color: 'red' },
+    { label: 'Commission Balance', value: formatKes(commissions.filter((item) => item.status !== 'Paid' && item.status !== 'Cancelled').reduce((sum, item) => sum + Number(item.amount || 0), 0)), letter: 'C', color: 'blue' },
   ];
 
   return (

@@ -5,6 +5,7 @@ import Dashboard from './features/dashboard/Dashboard';
 import RegisterRider from './features/register/RegisterRider';
 import Customers from './features/customers/Customers';
 import Commissions from './features/commissions/Commissions';
+import Screening from './features/screening/Screening';
 import Notifications from './features/notifications/Notifications';
 import Profile from './features/profile/Profile';
 import Settings from './features/settings/Settings';
@@ -15,6 +16,7 @@ const routes = [
   { id: 'register', screen: 'register', label: 'Register Rider', detail: 'Create a clean rider contract with duplicate protection' },
   { id: 'riders', screen: 'customers', label: 'Riders', detail: 'Portfolio, identity checks, documents, and evidence history' },
   { id: 'commissions', screen: 'commissions', label: 'Commissions', detail: 'Commission estimates, finance ledger, and CSV export' },
+  { id: 'screening', screen: 'screening', label: 'Screening', detail: 'Back-office queue approval, rejection, and info requests' },
   { id: 'notifications', screen: 'notifications', label: 'Notifications', detail: 'Document updates, rider alerts, and unread notices' },
   { id: 'settings', screen: 'settings', label: 'Settings', detail: 'Defaults, password, theme, and app preferences' },
   { id: 'account', screen: 'profile', label: 'Account', detail: 'Agent profile, identity, approval status, and sign out' },
@@ -44,6 +46,11 @@ const featureMenus = {
     { label: 'Read totals', detail: 'Compare finance ledger totals with estimated commission.' },
     { label: 'Review ledger', detail: 'Check paid, pending, and cancelled commission records.' },
     { label: 'Export report', detail: 'Download commission estimate or finance ledger CSV.' },
+  ],
+  screening: [
+    { label: 'Open queue', detail: 'Review pending applications submitted by agents.' },
+    { label: 'Approve application', detail: 'Approve a complete rider application and activate the account.' },
+    { label: 'Reject or request info', detail: 'Send a rejection or ask the agent for missing details.' },
   ],
   notifications: [
     { label: 'Open unread first', detail: 'Start from new alerts so rider and document issues are not missed.' },
@@ -574,6 +581,56 @@ export default function App() {
     audit(`Agent ${type}`, payload.title || payload.detail || `Updated customer ${customerId}`);
   };
 
+  const handleScreeningDecision = (customerId, decision, reason = '') => {
+    const statusMap = {
+      approve: { status: 'Active', screeningStatus: 'Approved', title: 'Application approved' },
+      reject: { status: 'Rejected', screeningStatus: 'Rejected', title: 'Application rejected' },
+      'info-required': { status: 'Info Required', screeningStatus: 'Info Required', title: 'More information required' },
+    };
+    const next = statusMap[decision];
+    if (!next) return;
+    const decidedAt = new Date().toLocaleString();
+    const decidedDate = new Date().toISOString().slice(0, 10);
+    const customer = customers.find((item) => item.id === customerId);
+    setCustomers((current) => current.map((item) => {
+      if (item.id !== customerId) return item;
+      const note = {
+        id: Date.now(),
+        type: 'screening',
+        title: next.title,
+        detail: reason || next.title,
+        agentCode: agent.agentCode,
+        time: decidedAt,
+        date: decidedDate,
+      };
+      return {
+        ...item,
+        status: next.status,
+        screeningStatus: next.screeningStatus,
+        screeningDecisionAt: decidedAt,
+        screeningDecisionReason: reason,
+        backOfficeQueue: item.backOfficeQueue ? {
+          ...item.backOfficeQueue,
+          status: next.screeningStatus,
+          reviewedAt: decidedAt,
+        } : item.backOfficeQueue,
+        riskNotes: [note, ...(item.riskNotes || [])].slice(0, 30),
+        overdue: next.status === 'Active' ? item.overdue : false,
+      };
+    }));
+    setNotifications((current) => [
+      {
+        id: Date.now(),
+        title: next.title,
+        body: `${customer?.name || 'Customer'}: ${reason || next.screeningStatus}.`,
+        unread: true,
+        category: 'screening',
+      },
+      ...current,
+    ]);
+    audit(next.title, `${customer?.name || customerId}: ${reason || next.screeningStatus}`);
+  };
+
   const updateCustomerChecklist = (customerId, key, value) => {
     setCustomers((current) => current.map((customer) => {
       if (customer.id !== customerId) return customer;
@@ -977,6 +1034,11 @@ export default function App() {
         detail: `${commissions.length} finance records are available, with estimates based on rider payment progress.`,
         metric: `KES ${commissions.reduce((sum, item) => sum + Number(item.amount || 0), 0).toLocaleString('en-KE')}`,
       },
+      screening: {
+        kicker: 'Back office',
+        detail: `${customers.filter((item) => item.status === 'Pending' || item.status === 'Info Required' || item.screeningStatus === 'Queued').length} applications need screening attention.`,
+        metric: 'Queue',
+      },
       notifications: {
         kicker: 'Alert center',
         detail: `${unreadAlerts} unread alerts are available for documents, riders, and tasks.`,
@@ -1129,10 +1191,11 @@ export default function App() {
             </View>
 
             <ScrollView contentContainerStyle={styles.pageContent} showsVerticalScrollIndicator={false}>
-              {activeRoute.screen === 'dashboard' && <Dashboard theme={theme} simpleMode={settings.simpleMode} selectedAction={activeRoute.action || ''} customers={customers} notifications={notifications} tasks={tasks} onCompleteTask={completeFollowUpTask} onHomeAction={openHomeAction} />}
+              {activeRoute.screen === 'dashboard' && <Dashboard theme={theme} simpleMode={settings.simpleMode} selectedAction={activeRoute.action || ''} customers={customers} commissions={commissions} notifications={notifications} tasks={tasks} onCompleteTask={completeFollowUpTask} onHomeAction={openHomeAction} />}
               {activeRoute.screen === 'register' && <RegisterRider theme={theme} selectedAction={activeRoute.action || ''} settings={settings} customers={customers} agent={agent} onSubmitRider={submitRider} />}
               {activeRoute.screen === 'customers' && <Customers theme={theme} simpleMode={settings.simpleMode} commandRiderId={commandRiderId} selectedAction={activeRoute.action || ''} customers={customers} agent={agent} privacyMode={security.privacyMode} onExportCsv={downloadCsv} onAddPayment={addCustomerPayment} onCreateTask={addFollowUpTask} onSendMessage={sendRiderMessage} onAgentRecord={addCustomerAgentRecord} onChecklistChange={updateCustomerChecklist} />}
               {activeRoute.screen === 'commissions' && <Commissions theme={theme} selectedAction={activeRoute.action || ''} commissions={commissions} customers={customers} onExportCsv={downloadCsv} />}
+              {activeRoute.screen === 'screening' && <Screening theme={theme} customers={customers} onDecision={handleScreeningDecision} />}
               {activeRoute.screen === 'notifications' && <Notifications theme={theme} selectedAction={activeRoute.action || ''} notifications={notifications} onMarkAllRead={markNotificationsRead} onOpenNotification={toggleNotificationDetails} />}
               {activeRoute.screen === 'profile' && <Profile theme={theme} selectedAction={activeRoute.action || ''} agent={agent} onUpdateAgent={handleUpdateAgent} onLogout={handleLogout} />}
               {activeRoute.screen === 'settings' && <Settings theme={theme} selectedAction={activeRoute.action || ''} settings={settings} onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} onToggleSetting={updateSetting} onUpdateSetting={updateSetting} onChangePassword={handleChangePassword} passwordMessage={passwordMessage} />}
