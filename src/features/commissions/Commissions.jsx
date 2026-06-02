@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import '../../../features/commissions/commissions.css';
 
 const formatKes = (amount) => `KES ${Number(amount || 0).toLocaleString('en-KE')}`;
@@ -13,6 +13,8 @@ const commissionRate = (progress) => {
 };
 
 export default function Commissions({ theme, selectedAction = '', commissions = [], customers = [], onExportCsv }) {
+  const { width } = useWindowDimensions();
+  const isPhone = width < 720;
   const paid = commissions.filter((item) => item.status === 'Paid').length;
   const pending = commissions.filter((item) => item.status === 'Pending').length;
   const cancelled = commissions.filter((item) => item.status === 'Cancelled').length;
@@ -91,7 +93,28 @@ export default function Commissions({ theme, selectedAction = '', commissions = 
         </TouchableOpacity>}
       </View>}
 
-      {show('Read totals', 'Review ledger', 'Export report') && (
+      {show('Read totals', 'Review ledger', 'Export report') && isPhone && (
+        <View style={styles.mobileList}>
+          {estimatedRows.map((item) => (
+            <View key={`estimate-card-${item.id}`} style={styles.mobileCard}>
+              <View style={styles.mobileCardHeader}>
+                <Text style={styles.mobileTitle}>{item.rider || '-'}</Text>
+                <Text style={[styles.mobileStatus, item.paidByFinance ? styles.statusTextPaid : item.rate > 0 ? styles.statusTextPending : styles.statusTextCancelled]}>
+                  {item.paidByFinance ? 'Paid' : item.rate > 0 ? 'Estimate' : 'No commission'}
+                </Text>
+              </View>
+              <InfoRow styles={styles} label="Card ID" value={item.cardId || '-'} />
+              <InfoRow styles={styles} label="Paid Amount" value={formatKes(item.paidAmount)} />
+              <InfoRow styles={styles} label="Progress" value={`${item.progress}%`} />
+              <InfoRow styles={styles} label="Rate" value={item.rate ? `${item.rate * 100}%` : '0%'} />
+              <InfoRow styles={styles} label="Commission" value={formatKes(item.commission)} strong />
+            </View>
+          ))}
+          {!estimatedRows.length && <Text style={styles.emptyText}>No riders available for commission estimates.</Text>}
+        </View>
+      )}
+
+      {show('Read totals', 'Review ledger', 'Export report') && !isPhone && (
         <ScrollView horizontal showsHorizontalScrollIndicator style={styles.tableWrap}>
           <View style={styles.table}>
             <View style={[styles.tableRow, styles.tableHead]}>
@@ -127,7 +150,24 @@ export default function Commissions({ theme, selectedAction = '', commissions = 
         </TouchableOpacity>}
       </View>}
 
-      {show('Review ledger', 'Filter by status mentally', 'Export report') && (
+      {show('Review ledger', 'Filter by status mentally', 'Export report') && isPhone && (
+        <View style={styles.mobileList}>
+          {commissions.map((item) => (
+            <View key={`ledger-card-${item.id}`} style={styles.mobileCard}>
+              <View style={styles.mobileCardHeader}>
+                <Text style={styles.mobileTitle}>{item.rider || '-'}</Text>
+                <Text style={[styles.mobileStatus, item.status === 'Paid' ? styles.statusTextPaid : item.status === 'Pending' ? styles.statusTextPending : styles.statusTextCancelled]}>{item.status || '-'}</Text>
+              </View>
+              <InfoRow styles={styles} label="Type" value={item.type || '-'} />
+              <InfoRow styles={styles} label="Amount" value={formatKes(item.amount)} strong />
+              <InfoRow styles={styles} label="Date" value={item.date || '-'} />
+            </View>
+          ))}
+          {!commissions.length && <Text style={styles.emptyText}>No commission records yet.</Text>}
+        </View>
+      )}
+
+      {show('Review ledger', 'Filter by status mentally', 'Export report') && !isPhone && (
         <ScrollView horizontal showsHorizontalScrollIndicator style={styles.tableWrap}>
           <View style={styles.table}>
             <View style={[styles.tableRow, styles.tableHead]}>
@@ -149,6 +189,15 @@ export default function Commissions({ theme, selectedAction = '', commissions = 
         </ScrollView>
       )}
     </ScrollView>
+  );
+}
+
+function InfoRow({ styles, label, value, strong = false }) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={[styles.infoValue, strong && styles.tableStrong]}>{value}</Text>
+    </View>
   );
 }
 
@@ -263,6 +312,61 @@ const createStyles = (theme) => {
     tableWrap: {
       marginHorizontal: 16,
       marginBottom: 18,
+    },
+    mobileList: {
+      marginHorizontal: 16,
+      marginBottom: 18,
+      gap: 10,
+    },
+    mobileCard: {
+      borderWidth: 1,
+      borderColor: dark ? '#11264b' : '#d8e3f7',
+      borderRadius: 8,
+      backgroundColor: dark ? '#092a75' : '#ffffff',
+      padding: 12,
+      gap: 8,
+    },
+    mobileCardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      gap: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: dark ? '#11264b' : '#eef3fb',
+      paddingBottom: 8,
+    },
+    mobileTitle: {
+      flex: 1,
+      color: dark ? '#f3f6fb' : '#0b1730',
+      fontSize: 15,
+      fontWeight: '900',
+      fontFamily: 'Georgia',
+    },
+    mobileStatus: {
+      fontSize: 12,
+      fontFamily: 'Georgia',
+      textAlign: 'right',
+    },
+    infoRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+      minHeight: 28,
+      alignItems: 'center',
+    },
+    infoLabel: {
+      color: dark ? '#aebbd0' : '#627083',
+      fontSize: 12,
+      fontWeight: '800',
+      fontFamily: 'Georgia',
+      flex: 1,
+    },
+    infoValue: {
+      color: dark ? '#f3f6fb' : '#0b1730',
+      fontSize: 13,
+      fontFamily: 'Georgia',
+      textAlign: 'right',
+      flex: 1,
     },
     table: {
       minWidth: 920,
