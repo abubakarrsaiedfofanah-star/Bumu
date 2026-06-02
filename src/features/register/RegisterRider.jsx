@@ -39,6 +39,7 @@ const riderStatus = (rider) => {
 const hasActiveDebt = (rider) => Number(rider.remaining || 0) > 0;
 const clean = (value) => String(value || '').trim().toLowerCase();
 const cleanPhone = (value) => String(value || '').replace(/[\s-]/g, '');
+const isSixDigitOtp = (value) => /^\d{6}$/.test(String(value || '').trim());
 
 export default function RegisterRider({ theme, selectedAction = '', settings, customers, agent = {}, onSubmitRider }) {
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -89,14 +90,14 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
       if (form.phone && !/^(?:\+254|254|0)(?:7|1)\d{8}$/.test(String(form.phone).replace(/[\s-]/g, ''))) next.phone = 'Use +2547..., +2541..., 07..., or 01...';
       if (form.nationalId && !/^\d{7,8}$/.test(form.nationalId.trim())) next.nationalId = 'National ID should be 7 to 8 digits';
       if (!customerOtpSent) next.customerOtp = 'Send OTP to rider phone first';
-      if (customerOtpSent && customerOtp !== '123456') next.customerOtp = 'Enter the OTP sent to rider phone';
+      if (customerOtpSent && !isSixDigitOtp(customerOtp)) next.customerOtp = 'Enter the 6-digit OTP sent to rider phone';
     }
     if (targetStep === 1) ['passport', 'idFront', 'idBack', 'idScan'].forEach((key) => required(key, key.replace(/([A-Z])/g, ' $1')));
     if (targetStep === 2) ['kinName', 'kinPhone', 'relationship'].forEach((key) => required(key, key.replace(/([A-Z])/g, ' $1')));
     if (targetStep === 2) {
       if (!kinOtpSent) next.kinOtp = 'Send OTP to next of kin first';
-      if (kinOtpSent && kinOtp !== '123456') next.kinOtp = 'Enter the OTP sent to next of kin';
-      if (kinOtp === '123456' && kinConsent !== 'yes') next.kinConsent = 'Next of kin must approve with Yes';
+      if (kinOtpSent && !isSixDigitOtp(kinOtp)) next.kinOtp = 'Enter the 6-digit OTP sent to next of kin';
+      if (isSixDigitOtp(kinOtp) && kinConsent !== 'yes') next.kinConsent = 'Next of kin must approve with Yes';
     }
     if (targetStep === 3) ['bikeModel', 'chassis', 'deposit', 'installment'].forEach((key) => required(key, key.replace(/([A-Z])/g, ' $1')));
     setErrors(next);
@@ -287,7 +288,6 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
           </TouchableOpacity>
           {customerOtpSent && (
             <>
-              <Text style={styles.otpHint}>Demo OTP: 123456</Text>
               <TextInput
                 style={styles.input}
                 value={customerOtp}
@@ -368,7 +368,6 @@ export default function RegisterRider({ theme, selectedAction = '', settings, cu
           </TouchableOpacity>
           {kinOtpSent && (
             <>
-              <Text style={styles.otpHint}>Demo OTP: 123456</Text>
               <TextInput
                 style={styles.input}
                 value={kinOtp}

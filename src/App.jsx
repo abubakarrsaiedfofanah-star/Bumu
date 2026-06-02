@@ -69,10 +69,14 @@ const featureMenus = {
   ],
 };
 
+const STORAGE_PREFIX = 'bumu-live-v1';
+
+const storageKey = (key) => `${STORAGE_PREFIX}-${key}`;
+
 const loadState = (key, defaultValue) => {
   if (typeof window === 'undefined') return defaultValue;
   try {
-    const raw = window.localStorage.getItem(`bumu-${key}`);
+    const raw = window.localStorage.getItem(storageKey(key));
     return raw ? JSON.parse(raw) : defaultValue;
   } catch {
     return defaultValue;
@@ -82,7 +86,7 @@ const loadState = (key, defaultValue) => {
 const saveState = (key, value) => {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(`bumu-${key}`, JSON.stringify(value));
+    window.localStorage.setItem(storageKey(key), JSON.stringify(value));
   } catch {
     // Ignore storage errors in private mode.
   }
@@ -139,40 +143,18 @@ const accountStatus = (customer) => {
   return `Debt active: KES ${remaining.toLocaleString('en-KE')}`;
 };
 
-const initialCustomers = [
-  { id: 1, name: 'John Doe', phone: '0710 123 456', nationalId: '23456789', region: 'Nairobi', location: 'Nairobi', occupation: 'Courier', status: 'Active', cardId: 'BUMU-KE-0001-7A3C', bike: 'Boxer 150', chassis: 'BX150-24-9182', deposit: 'KES 18,000', installment: 'Daily KES 300', totalPrice: 180000, progress: 72, lastPayment: 'KES 1,200 two days ago', paid: 129600, remaining: 50400, dueDate: '2026-06-21', risk: 32, overdue: false, createdAt: '2026-05-20', transactions: [{ id: 101, date: '2026-05-24', amount: 18000, type: 'Deposit', note: 'Initial deposit', balanceAfter: 162000 }, { id: 102, date: '2026-05-29', amount: 111600, type: 'Installment', note: 'Multiple payments', balanceAfter: 50400 }] },
-  { id: 2, name: 'Jane Mwangi', phone: '0720 234 567', nationalId: '28661102', region: 'Mombasa', location: 'Mombasa', occupation: 'Retailer', status: 'Pending', cardId: 'BUMU-KE-0002-8B4D', bike: 'TVS Star', chassis: 'TVS-91-4408', deposit: 'KES 12,000', installment: 'Weekly KES 2,000', totalPrice: 150000, progress: 38, lastPayment: 'KES 900 seven days ago', paid: 57000, remaining: 93000, dueDate: '2026-05-30', risk: 56, overdue: true, createdAt: '2026-05-25', transactions: [{ id: 201, date: '2026-05-25', amount: 12000, type: 'Deposit', note: 'Initial deposit', balanceAfter: 138000 }, { id: 202, date: '2026-05-28', amount: 45000, type: 'Installment', note: 'Weekly payment', balanceAfter: 93000 }] },
-  { id: 3, name: 'Paul Kimani', phone: '0730 345 678', nationalId: '31880044', region: 'Kisumu', location: 'Kisumu', occupation: 'Rider', status: 'Active', cardId: 'BUMU-KE-0003-9C5E', bike: 'Boxer 150', chassis: 'BX150-73-1160', deposit: 'KES 20,000', installment: 'Daily KES 300', totalPrice: 180000, progress: 88, lastPayment: 'KES 1,500 yesterday', paid: 158400, remaining: 21600, dueDate: '2026-06-12', risk: 21, overdue: false, createdAt: '2026-05-18', transactions: [{ id: 301, date: '2026-05-18', amount: 20000, type: 'Deposit', note: 'Initial deposit', balanceAfter: 160000 }, { id: 302, date: '2026-05-28', amount: 138400, type: 'Installment', note: 'Daily payments', balanceAfter: 21600 }] },
-  { id: 4, name: 'Alice Njeri', phone: '0711 456 789', nationalId: '25119005', region: 'Nakuru', location: 'Nakuru', occupation: 'Trader', status: 'Info Required', cardId: 'BUMU-KE-0004-0D6F', bike: 'Boxer 150', chassis: 'BX150-73-9001', deposit: 'KES 10,000', installment: 'Daily KES 300', totalPrice: 180000, progress: 15, lastPayment: 'KES 300 three weeks ago', paid: 27000, remaining: 153000, dueDate: '2026-05-20', risk: 78, overdue: true, createdAt: '2026-05-15', transactions: [{ id: 401, date: '2026-05-16', amount: 10000, type: 'Deposit', note: 'Initial deposit', balanceAfter: 170000 }, { id: 402, date: '2026-05-21', amount: 17000, type: 'Installment', note: 'Partial payment', balanceAfter: 153000 }] },
-];
-
-const initialCommissions = [
-  { id: 1, rider: 'John Doe', type: 'Upfront', amount: 4200, status: 'Paid', date: '2026-05-16' },
-  { id: 2, rider: 'Jane Mwangi', type: 'Installment', amount: 1800, status: 'Pending', date: '2026-05-21' },
-  { id: 3, rider: 'Paul Kimani', type: 'Referral', amount: 900, status: 'Paid', date: '2026-05-14' },
-  { id: 4, rider: 'Alice Njeri', type: 'Upfront', amount: 2200, status: 'Cancelled', date: '2026-05-08' },
-];
-
-const initialNotifications = [
-  { id: 1, title: 'Rider update received', body: 'John Doe has a new account update to review.', unread: true, category: 'rider' },
-  { id: 2, title: 'Document update needed', body: 'Alice Njeri uploaded a new ID photo for review.', unread: true, category: 'document' },
-  { id: 3, title: 'Agent notice', body: 'Your agent account has a new office notice.', unread: false, category: 'notice' },
-  { id: 4, title: 'New rider pending', body: 'Jane Mwangi requires verification for the first review.', unread: false, category: 'task' },
-];
-
-const initialTasks = [
-  { id: 1, customerId: 2, customerName: 'Jane Mwangi', title: 'Verify rider status', due: 'Today', status: 'Open', note: 'Confirm rider details and document scan.' },
-  { id: 2, customerId: 4, customerName: 'Alice Njeri', title: 'Review verification documents', due: 'Tomorrow', status: 'Open', note: 'Check latest ID photo and confirm next steps.' },
-  { id: 3, customerId: 1, customerName: 'John Doe', title: 'Confirm rider follow-up', due: 'Next 2 days', status: 'Open', note: 'Touch base on rider progress and next follow-up.' },
-];
+const initialCustomers = [];
+const initialCommissions = [];
+const initialNotifications = [];
+const initialTasks = [];
 
 const defaultAgent = {
-  fullName: 'Ann Mwangi',
-  agentCode: 'AG-KE-DEMO-02048',
-  phone: '0710 888 222',
-  email: 'ann.mwangi@bumu.co.ke',
-  region: 'Nairobi',
-  password: 'agent123',
+  fullName: '',
+  agentCode: '',
+  phone: '',
+  email: '',
+  region: '',
+  password: '',
   agentPhoto: '',
   agentIdFront: '',
   agentIdBack: '',
@@ -199,7 +181,7 @@ export default function App() {
   const [appInstalled, setAppInstalled] = useState(() => loadState('app-installed', false));
   const [security, setSecurity] = useState(() => loadState('security', {
     locked: false,
-    pin: '1234',
+    pin: '',
     unlockPin: '',
     privacyMode: false,
     auditLog: [],
@@ -391,16 +373,6 @@ export default function App() {
   }, [customers]);
 
   const handleLogin = (email, password) => {
-    if (email === defaultAgent.email && password === defaultAgent.password) {
-      setAgent((current) => ({
-        ...defaultAgent,
-        agentPhoto: current.agentPhoto || defaultAgent.agentPhoto,
-        agentIdFront: current.agentIdFront || defaultAgent.agentIdFront,
-        agentIdBack: current.agentIdBack || defaultAgent.agentIdBack,
-      }));
-      setLoggedIn(true);
-      return true;
-    }
     if (!agent || !agent.email) return false;
     if (email !== agent.email || password !== agent.password) return false;
     if (agent.approvalStatus && agent.approvalStatus !== 'Approved') return false;
@@ -919,42 +891,12 @@ export default function App() {
     downloadCsv('bumu-audit-trail.csv', [['Time', 'Agent', 'Action', 'Details'], ...(security.auditLog || []).map((entry) => [entry.time, entry.agent, entry.action, entry.details])]);
   };
 
-  const resetDemoData = () => {
-    setCustomers(initialCustomers.map((c, index, current) => {
-      const assignedAgentCode = c.assignedAgentCode || c.agentCode || agent.agentCode;
-      const cardId = c.cardId || generateRiderCardId(assignedAgentCode, `${c.nationalId || c.phone || index}`, current);
-      const riderAssignmentId = c.riderAssignmentId || `ASN-${assignedAgentCode}-${checksum(`${cardId}:${c.id}`)}`;
-      const riderPersonId = c.riderPersonId || generateRiderPersonId(c);
-      const contractId = c.contractId || generateContractId(assignedAgentCode, `${cardId}:${c.id}`, current);
-      const risk = computeRisk(c);
-      const verifiedByDefault = c.status === 'Active' && risk < 60 && !c.flagged;
-      return {
-        ...c,
-        cardId,
-        riderPersonId,
-        contractId,
-        assignedAgentCode,
-        agentCode: assignedAgentCode,
-        registeredByAgentCode: c.registeredByAgentCode || assignedAgentCode,
-        riderAssignmentId,
-        contractStatus: c.contractStatus || (Number(c.remaining || 0) > 0 ? 'Active' : 'Cleared'),
-        contractSequence: c.contractSequence || 1,
-        verificationChecklist: {
-          idSeen: verifiedByDefault,
-          chassisConfirmed: verifiedByDefault,
-          passportPhoto: verifiedByDefault,
-          idFront: verifiedByDefault,
-          idBack: verifiedByDefault,
-          idScan: verifiedByDefault,
-          ...(c.verificationChecklist || {}),
-        },
-        risk,
-        flagged: risk >= 60,
-      };
-    }));
+  const resetLocalPortalData = () => {
+    setCustomers(initialCustomers);
     setCommissions(initialCommissions);
     setNotifications(initialNotifications);
-    audit('Demo data reset', 'Restored default riders and commissions');
+    setTasks(initialTasks);
+    audit('Local data reset', 'Cleared local rider, commission, notification, and task records');
   };
 
   const themeStyles = theme === 'dark' ? styles.darkShell : styles.lightShell;
@@ -1079,7 +1021,7 @@ export default function App() {
       <SafeAreaView style={[styles.shell, themeStyles]}>
         <View style={styles.lockCard}>
           <Text style={[styles.brand, theme === 'dark' ? styles.textLight : styles.textDark]}>Session Locked</Text>
-          <Text style={[styles.pageSubtitle, theme === 'dark' ? styles.textMutedLight : styles.textMuted]}>Enter secure PIN to continue. Demo PIN is 1234 unless changed.</Text>
+          <Text style={[styles.pageSubtitle, theme === 'dark' ? styles.textMutedLight : styles.textMuted]}>Enter secure PIN to continue.</Text>
           <TextInput
             style={styles.lockInput}
             value={security.unlockPin}

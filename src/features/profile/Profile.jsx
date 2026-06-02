@@ -5,20 +5,20 @@ import '../../../features/profile/profile.css';
 export default function Profile({ theme, selectedAction = '', agent = {}, onUpdateAgent, onLogout }) {
   const [editing, setEditing] = useState(false);
   const [profile, setProfile] = useState({
-    fullName: agent.fullName || 'Ann Mwangi',
-    agentCode: agent.agentCode || 'AG-2048',
-    phone: agent.phone || '0710 888 222',
-    email: agent.email || 'ann.mwangi@bumu.co.ke',
-    region: agent.region || 'Nairobi',
+    fullName: agent.fullName || '',
+    agentCode: agent.agentCode || '',
+    phone: agent.phone || '',
+    email: agent.email || '',
+    region: agent.region || '',
   });
 
   useEffect(() => {
     setProfile({
-      fullName: agent.fullName || 'Ann Mwangi',
-      agentCode: agent.agentCode || 'AG-2048',
-      phone: agent.phone || '0710 888 222',
-      email: agent.email || 'ann.mwangi@bumu.co.ke',
-      region: agent.region || 'Nairobi',
+      fullName: agent.fullName || '',
+      agentCode: agent.agentCode || '',
+      phone: agent.phone || '',
+      email: agent.email || '',
+      region: agent.region || '',
     });
   }, [agent]);
 

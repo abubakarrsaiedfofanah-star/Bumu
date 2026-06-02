@@ -2,6 +2,8 @@ import React, { useState, useMemo, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import '../../../features/auth/auth.css';
 
+const isSixDigitOtp = (value) => /^\d{6}$/.test(String(value || '').trim());
+
 export default function Auth({ agent, onLogin, onRegister, onResetPassword = () => false, theme = 'light' }) {
   const [mode, setMode] = useState('login');
   const [fullName, setFullName] = useState('');
@@ -51,7 +53,7 @@ export default function Auth({ agent, onLogin, onRegister, onResetPassword = () 
       setMessage('Enter email, admin OTP, and the new password.');
       return;
     }
-    if (adminCode !== '123456') {
+    if (!isSixDigitOtp(adminCode)) {
       setMessage('Enter the 6-digit code sent by admin.');
       return;
     }
@@ -204,7 +206,7 @@ export default function Auth({ agent, onLogin, onRegister, onResetPassword = () 
   );
 
   const verifyAdminCode = () => {
-    const verified = adminCode === '123456';
+    const verified = isSixDigitOtp(adminCode);
     setAdminCodeVerified(verified);
     setMessage(verified ? 'Admin code verified.' : 'Enter the 6-digit code sent by admin.');
   };

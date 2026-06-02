@@ -63,8 +63,8 @@ src/
 
 ## Notes & Next Steps
 
-- Risk rules are currently client-side demo logic. For robust enforcement, add server-side validation, immutable audit logs, and OTP/device checks.
-- Want me to tune colors, thresholds, or add OTP flows and hold/release workflows? Tell me which features to prioritize and I'll implement them.
+- Risk rules are currently client-side placeholders. For robust enforcement, add server-side validation, immutable audit logs, and OTP/device checks.
+- Next backend step: connect authentication, OTP, customer onboarding, screening, payments, and commission data to live API/Supabase services.
 
 ---
 
