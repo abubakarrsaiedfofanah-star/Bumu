@@ -16,7 +16,7 @@ export default function Commissions({ theme, selectedAction = '', commissions = 
   const paid = commissions.filter((item) => item.status === 'Paid').length;
   const pending = commissions.filter((item) => item.status === 'Pending').length;
   const cancelled = commissions.filter((item) => item.status === 'Cancelled').length;
-  const totalEarned = commissions.reduce((sum, item) => sum + item.amount, 0);
+  const totalEarned = commissions.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const ledgerByRider = commissions.reduce((acc, item) => {
     const key = String(item.rider || '').trim().toLowerCase();
     if (!key) return acc;
@@ -40,7 +40,6 @@ export default function Commissions({ theme, selectedAction = '', commissions = 
       commission: Math.round(paidAmount * rate),
       status: ledger?.status === 'Paid' ? 'Paid by Finance' : rate > 0 ? 'Estimated / Waiting Finance' : 'Not eligible yet',
       financeStatus,
-      financeAmount: Number(ledger?.amount || 0),
       paidByFinance: ledger?.status === 'Paid',
     };
   });
@@ -55,7 +54,7 @@ export default function Commissions({ theme, selectedAction = '', commissions = 
       {show('Read totals') && <View style={styles.summaryGrid}>
         <View style={[styles.summaryCard, styles.primaryCard]}>
           <Text style={styles.summaryLabel}>Finance Ledger</Text>
-          <Text style={styles.summaryValue}>KES {totalEarned.toLocaleString()}</Text>
+          <Text style={styles.summaryValue}>{formatKes(totalEarned)}</Text>
         </View>
         <View style={[styles.summaryCard, styles.successCard]}>
           <Text style={styles.summaryLabel}>Estimated Commission</Text>
@@ -92,23 +91,31 @@ export default function Commissions({ theme, selectedAction = '', commissions = 
         </TouchableOpacity>}
       </View>}
 
-      {show('Read totals', 'Review ledger', 'Export report') && estimatedRows.map((item) => (
-        <View key={`estimate-${item.id}`} style={styles.commissionRow}>
-          <View style={styles.rowLeft}>
-            <Text style={styles.rowName}>{item.rider}</Text>
-            <Text style={styles.rowMeta}>{item.progress}% paid | Paid amount {formatKes(item.paidAmount)}</Text>
-            <Text style={styles.rowMeta}>Rate: {item.rate ? `${item.rate * 100}%` : '0% below threshold'} | {item.status}</Text>
-            {item.paidByFinance && <Text style={styles.paidProofText}>Finance paid record: {formatKes(item.financeAmount)}</Text>}
-          </View>
-          <View style={styles.rowRight}>
-            <View style={[styles.paidIcon, item.paidByFinance ? styles.paidIconOn : styles.paidIconOff]}>
-              <Text style={[styles.paidIconText, !item.paidByFinance && styles.paidIconTextOff]}>{item.paidByFinance ? '✓' : '-'}</Text>
+      {show('Read totals', 'Review ledger', 'Export report') && (
+        <ScrollView horizontal showsHorizontalScrollIndicator style={styles.tableWrap}>
+          <View style={styles.table}>
+            <View style={[styles.tableRow, styles.tableHead]}>
+              {['Rider', 'Card ID', 'Paid Amount', 'Progress', 'Rate', 'Commission', 'Status'].map((label) => (
+                <Text key={label} style={[styles.tableCell, styles.tableHeadText]}>{label}</Text>
+              ))}
             </View>
-            <Text style={styles.rowAmount}>{formatKes(item.commission)}</Text>
-            <Text style={[styles.statusBadge, item.paidByFinance ? styles.statusPaid : item.rate > 0 ? styles.statusPending : styles.statusCancelled]}>{item.paidByFinance ? 'Paid' : item.rate > 0 ? 'Estimate' : 'No commission'}</Text>
+            {estimatedRows.map((item) => (
+              <View key={`estimate-${item.id}`} style={styles.tableRow}>
+                <Text style={[styles.tableCell, styles.tableStrong]}>{item.rider || '-'}</Text>
+                <Text style={styles.tableCell}>{item.cardId || '-'}</Text>
+                <Text style={styles.tableCell}>{formatKes(item.paidAmount)}</Text>
+                <Text style={styles.tableCell}>{item.progress}%</Text>
+                <Text style={styles.tableCell}>{item.rate ? `${item.rate * 100}%` : '0%'}</Text>
+                <Text style={[styles.tableCell, styles.tableStrong]}>{formatKes(item.commission)}</Text>
+                <Text style={[styles.tableCell, item.paidByFinance ? styles.statusTextPaid : item.rate > 0 ? styles.statusTextPending : styles.statusTextCancelled]}>
+                  {item.paidByFinance ? 'Paid' : item.rate > 0 ? 'Estimate' : 'No commission'}
+                </Text>
+              </View>
+            ))}
+            {!estimatedRows.length && <Text style={styles.emptyText}>No riders available for commission estimates.</Text>}
           </View>
-        </View>
-      ))}
+        </ScrollView>
+      )}
 
       {show('Review ledger', 'Filter by status mentally', 'Export report') && <View style={styles.tableHeader}>
         <Text style={styles.tableTitle}>Finance Commission Ledger</Text>
@@ -120,23 +127,27 @@ export default function Commissions({ theme, selectedAction = '', commissions = 
         </TouchableOpacity>}
       </View>}
 
-      {show('Review ledger', 'Filter by status mentally', 'Export report') && commissions.map((item) => (
-        <View key={item.id} style={styles.commissionRow}>
-          <View style={styles.rowLeft}>
-            <Text style={styles.rowName}>{item.rider}</Text>
-            <Text style={styles.rowMeta}>{item.type} • {item.date}</Text>
-          </View>
-          <View style={styles.rowRight}>
-            <View style={[styles.paidIcon, item.status === 'Paid' ? styles.paidIconOn : styles.paidIconOff]}>
-              <Text style={[styles.paidIconText, item.status !== 'Paid' && styles.paidIconTextOff]}>{item.status === 'Paid' ? '✓' : '-'}</Text>
+      {show('Review ledger', 'Filter by status mentally', 'Export report') && (
+        <ScrollView horizontal showsHorizontalScrollIndicator style={styles.tableWrap}>
+          <View style={styles.table}>
+            <View style={[styles.tableRow, styles.tableHead]}>
+              {['Rider', 'Type', 'Amount', 'Status', 'Date'].map((label) => (
+                <Text key={label} style={[styles.tableCell, styles.tableHeadText]}>{label}</Text>
+              ))}
             </View>
-            <Text style={styles.rowAmount}>KES {item.amount.toLocaleString()}</Text>
-            <Text style={[styles.statusBadge, item.status === 'Paid' ? styles.statusPaid : item.status === 'Pending' ? styles.statusPending : styles.statusCancelled]}>{item.status}</Text>
+            {commissions.map((item) => (
+              <View key={item.id} style={styles.tableRow}>
+                <Text style={[styles.tableCell, styles.tableStrong]}>{item.rider || '-'}</Text>
+                <Text style={styles.tableCell}>{item.type || '-'}</Text>
+                <Text style={[styles.tableCell, styles.tableStrong]}>{formatKes(item.amount)}</Text>
+                <Text style={[styles.tableCell, item.status === 'Paid' ? styles.statusTextPaid : item.status === 'Pending' ? styles.statusTextPending : styles.statusTextCancelled]}>{item.status || '-'}</Text>
+                <Text style={styles.tableCell}>{item.date || '-'}</Text>
+              </View>
+            ))}
+            {!commissions.length && <Text style={styles.emptyText}>No commission records yet.</Text>}
           </View>
-        </View>
-      ))}
-
-      {show('Review ledger', 'Filter by status mentally', 'Export report') && !commissions.length && <Text style={styles.emptyText}>No commission records yet.</Text>}
+        </ScrollView>
+      )}
     </ScrollView>
   );
 }
@@ -162,7 +173,7 @@ const createStyles = (theme) => {
       flexGrow: 1,
       flexBasis: 220,
       backgroundColor: dark ? '#092a75' : '#f5f8ff',
-      borderRadius: 16,
+      borderRadius: 8,
       padding: 18,
       minHeight: 110,
       shadowColor: '#000',
@@ -220,7 +231,7 @@ const createStyles = (theme) => {
       borderWidth: 1,
       borderColor: dark ? '#11264b' : '#d8e3f7',
       backgroundColor: dark ? '#092a75' : '#f5f8ff',
-      borderRadius: 14,
+      borderRadius: 8,
       padding: 16,
       gap: 6,
     },
@@ -239,7 +250,7 @@ const createStyles = (theme) => {
     },
     exportButton: {
       backgroundColor: '#0f5fff',
-      borderRadius: 14,
+      borderRadius: 8,
       paddingVertical: 10,
       paddingHorizontal: 16,
     },
@@ -249,107 +260,57 @@ const createStyles = (theme) => {
       fontFamily: 'Georgia',
       fontWeight: '700',
     },
-    commissionRow: {
-      backgroundColor: dark ? '#092a75' : '#f5f8ff',
-      borderRadius: 18,
+    tableWrap: {
       marginHorizontal: 16,
-      marginBottom: 12,
-      padding: 18,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      gap: 12,
+      marginBottom: 18,
+    },
+    table: {
+      minWidth: 920,
       borderWidth: 1,
-      borderColor: dark ? '#11264b' : '#e6eef3',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.06,
-      shadowRadius: 14,
-      elevation: 3,
-    },
-    rowLeft: {
-      flex: 1,
-      minWidth: 210,
-      marginRight: 14,
-    },
-    rowName: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: dark ? '#f3f6fb' : '#0b1730',
-      fontFamily: 'Georgia',
-      marginBottom: 4,
-    },
-    rowMeta: {
-      fontSize: 12,
-      color: dark ? '#aebbd0' : '#627083',
-      fontFamily: 'Georgia',
-    },
-    rowRight: {
-      alignItems: 'flex-end',
-      minWidth: 110,
-    },
-    paidIcon: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 8,
-      borderWidth: 1,
-    },
-    paidIconOn: {
-      backgroundColor: '#0f5fff',
-      borderColor: '#0f5fff',
-    },
-    paidIconOff: {
-      backgroundColor: dark ? '#111b24' : '#ffffff',
-      borderColor: dark ? '#26364a' : '#d8e3f7',
-    },
-    paidIconText: {
-      color: '#ffffff',
-      fontSize: 15,
-      fontWeight: '900',
-      fontFamily: 'Georgia',
-    },
-    paidIconTextOff: {
-      color: dark ? '#b8c3d7' : '#627083',
-    },
-    rowAmount: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: dark ? '#f3f6fb' : '#0b1730',
-      fontFamily: 'Georgia',
-      marginBottom: 8,
-    },
-    paidProofText: {
-      color: '#0f5fff',
-      fontSize: 12,
-      fontWeight: '900',
-      fontFamily: 'Georgia',
-      marginTop: 4,
-    },
-    statusBadge: {
-      borderRadius: 999,
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-      fontSize: 11,
-      fontFamily: 'Georgia',
-      color: '#ffffff',
+      borderColor: dark ? '#11264b' : '#d8e3f7',
+      borderRadius: 8,
       overflow: 'hidden',
+      backgroundColor: dark ? '#092a75' : '#ffffff',
     },
-    statusPaid: {
-      backgroundColor: '#2f7cff',
+    tableRow: {
+      flexDirection: 'row',
+      minHeight: 48,
+      borderBottomWidth: 1,
+      borderBottomColor: dark ? '#11264b' : '#eef3fb',
+      alignItems: 'center',
     },
-    statusPending: {
-      backgroundColor: '#b86800',
+    tableHead: {
+      backgroundColor: dark ? '#0f1720' : '#f5f8ff',
     },
-    statusCancelled: {
-      backgroundColor: '#bd2a2a',
+    tableCell: {
+      width: 132,
+      paddingVertical: 11,
+      paddingHorizontal: 10,
+      fontSize: 12,
+      color: dark ? '#f3f6fb' : '#0b1730',
+      fontFamily: 'Georgia',
+    },
+    tableHeadText: {
+      color: '#0f5fff',
+      fontWeight: '900',
+    },
+    tableStrong: {
+      fontWeight: '900',
+    },
+    statusTextPaid: {
+      color: '#0f5fff',
+      fontWeight: '900',
+    },
+    statusTextPending: {
+      color: '#b86800',
+      fontWeight: '900',
+    },
+    statusTextCancelled: {
+      color: '#bd2a2a',
+      fontWeight: '900',
     },
     emptyText: {
-      marginTop: 24,
-      textAlign: 'center',
+      padding: 18,
       color: dark ? '#aebbd0' : '#627083',
       fontFamily: 'Georgia',
     },
