@@ -4,6 +4,7 @@ import Auth from './features/auth/Auth';
 import Dashboard from './features/dashboard/Dashboard';
 import RegisterRider from './features/register/RegisterRider';
 import Customers from './features/customers/Customers';
+import Commissions from './features/commissions/Commissions';
 import Notifications from './features/notifications/Notifications';
 import Profile from './features/profile/Profile';
 import Settings from './features/settings/Settings';
@@ -13,6 +14,7 @@ const routes = [
   { id: 'dashboard', screen: 'dashboard', label: 'Dashboard', detail: 'Targets, follow-ups, alerts, and urgent rider actions' },
   { id: 'register', screen: 'register', label: 'Register Rider', detail: 'Create a clean rider contract with duplicate protection' },
   { id: 'riders', screen: 'customers', label: 'Riders', detail: 'Portfolio, identity checks, documents, and evidence history' },
+  { id: 'commissions', screen: 'commissions', label: 'Commissions', detail: 'Commission estimates, finance ledger, and CSV export' },
   { id: 'notifications', screen: 'notifications', label: 'Notifications', detail: 'Document updates, rider alerts, and unread notices' },
   { id: 'settings', screen: 'settings', label: 'Settings', detail: 'Defaults, password, theme, and app preferences' },
   { id: 'account', screen: 'profile', label: 'Account', detail: 'Agent profile, identity, approval status, and sign out' },
@@ -37,6 +39,11 @@ const featureMenus = {
     { label: 'Open rider summary', detail: 'Check rider identity, agent assignment, balance status, and risk score.' },
     { label: 'Verify evidence', detail: 'Record visit proof, ID scan, chassis check, promise to pay, and evidence logs.' },
     { label: 'Export portfolio', detail: 'Download rider records when reporting is needed.' },
+  ],
+  commissions: [
+    { label: 'Read totals', detail: 'Compare finance ledger totals with estimated commission.' },
+    { label: 'Review ledger', detail: 'Check paid, pending, and cancelled commission records.' },
+    { label: 'Export report', detail: 'Download commission estimate or finance ledger CSV.' },
   ],
   notifications: [
     { label: 'Open unread first', detail: 'Start from new alerts so rider and document issues are not missed.' },
@@ -965,6 +972,11 @@ export default function App() {
         detail: `${flaggedRiders} rider accounts need closer attention before the next review.`,
         metric: `${customers.length} riders`,
       },
+      commissions: {
+        kicker: 'Commission desk',
+        detail: `${commissions.length} finance records are available, with estimates based on rider payment progress.`,
+        metric: `KES ${commissions.reduce((sum, item) => sum + Number(item.amount || 0), 0).toLocaleString('en-KE')}`,
+      },
       notifications: {
         kicker: 'Alert center',
         detail: `${unreadAlerts} unread alerts are available for documents, riders, and tasks.`,
@@ -982,7 +994,7 @@ export default function App() {
       },
     };
     return insights[route] || insights.dashboard;
-  }, [agent, customers, notifications, route, settings, tasks, theme]);
+  }, [agent, commissions, customers, notifications, route, settings, tasks, theme]);
   const portalStatus = useMemo(() => {
     const openTasks = tasks.filter((item) => item.status !== 'Done').length;
     const unreadAlerts = notifications.filter((item) => item.unread).length;
@@ -1120,6 +1132,7 @@ export default function App() {
               {activeRoute.screen === 'dashboard' && <Dashboard theme={theme} simpleMode={settings.simpleMode} selectedAction={activeRoute.action || ''} customers={customers} notifications={notifications} tasks={tasks} onCompleteTask={completeFollowUpTask} onHomeAction={openHomeAction} />}
               {activeRoute.screen === 'register' && <RegisterRider theme={theme} selectedAction={activeRoute.action || ''} settings={settings} customers={customers} agent={agent} onSubmitRider={submitRider} />}
               {activeRoute.screen === 'customers' && <Customers theme={theme} simpleMode={settings.simpleMode} commandRiderId={commandRiderId} selectedAction={activeRoute.action || ''} customers={customers} agent={agent} privacyMode={security.privacyMode} onExportCsv={downloadCsv} onAddPayment={addCustomerPayment} onCreateTask={addFollowUpTask} onSendMessage={sendRiderMessage} onAgentRecord={addCustomerAgentRecord} onChecklistChange={updateCustomerChecklist} />}
+              {activeRoute.screen === 'commissions' && <Commissions theme={theme} selectedAction={activeRoute.action || ''} commissions={commissions} customers={customers} onExportCsv={downloadCsv} />}
               {activeRoute.screen === 'notifications' && <Notifications theme={theme} selectedAction={activeRoute.action || ''} notifications={notifications} onMarkAllRead={markNotificationsRead} onOpenNotification={toggleNotificationDetails} />}
               {activeRoute.screen === 'profile' && <Profile theme={theme} selectedAction={activeRoute.action || ''} agent={agent} onUpdateAgent={handleUpdateAgent} onLogout={handleLogout} />}
               {activeRoute.screen === 'settings' && <Settings theme={theme} selectedAction={activeRoute.action || ''} settings={settings} onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} onToggleSetting={updateSetting} onUpdateSetting={updateSetting} onChangePassword={handleChangePassword} passwordMessage={passwordMessage} />}
